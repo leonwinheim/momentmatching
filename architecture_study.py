@@ -4,7 +4,20 @@ import matplotlib.pyplot as plt
 import seaborn as sns
 from sklearn import mixture
 import os
+import pickle
+import time
+
 os.environ["LOKY_MAX_CPU_COUNT"] = "12"  # Limit the number of threads used by joblib, windows 11 stuff
+
+# Checkl for CUDA Availability
+try_cuda = False
+
+if torch.cuda.is_available() and try_cuda:
+    device = torch.device("cuda")
+    print("Using GPU")
+else:
+    device = torch.device("cpu")
+    print("Using CPU")
 
 #ALL COMPUTATIONS HERE ARE WITHOUT BIAS
 
@@ -56,7 +69,10 @@ def network(z_0,layers,gm_comp, weights):
     z_gm = z_0 
     for i in range(len(layers)-1):
         #print(f" Pass layer with {layers[i]} neurons to layer with {layers[i+1]} neurons")
-        z = single_layer_pass(z,weights[i])
+        z = single_layer_pass(z, weights[i].to(device))
+
+        z_gm = gm_fit_and_sample(z_gm,gm_comp[i],z.shape[0]) # Fit and sample the GM
+
         z_gm = single_layer_pass(z_gm,weights[i]) 
     
     return z,z_gm
@@ -64,11 +80,11 @@ def network(z_0,layers,gm_comp, weights):
 def gm_fit_and_sample(z,components,num_samples):
     """Take a sample based distribution and fit a GM to it.
         Then, sample and return the intermediate samples"""
-    z_out = torch.zeros_like(z) # Initialize the output tensor
+    z_out = torch.zeros_like(z).to(device) # Initialize the output tensor
     gm = mixture.GaussianMixture(n_components=components, covariance_type="full")
     for i in range(z.shape[2]):
         gm.fit(z[:,0,i].reshape(-1,1)) # Fit the GM to the data
-        z_out[:,0,i] = torch.tensor(gm.sample(num_samples)[0], dtype=torch.float32).squeeze()# Sample from the GM
+        z_out[:,0,i] = torch.tensor(gm.sample(num_samples)[0], dtype=torch.float32,device=device).squeeze()# Sample from the GM
     
     return z_out
 
@@ -82,39 +98,79 @@ def evaluate_moments(z,z_gm):
     gm_mean = torch.mean(z_gm, dim=0)
     gm_var = torch.var(z_gm, dim=0)
 
-    # Print the results
-    print("Mean of direct version: ", mean)
-    print("Variance of direct version: ", var)
-    print("Mean of Gaussian Mixture version: ", gm_mean)
-    print("Variance of Gaussian Mixture version: ", gm_var)
-
     mean_diff = torch.abs(mean - gm_mean)
     var_diff = torch.abs(var - gm_var)
+
+    # print(f"Mean difference: {mean_diff}")
+    # print(f"Variance difference: {var_diff}")
+
+    mean_diff = mean_diff.to("cpu")
+    var_diff = var_diff.to("cpu")
 
     return mean_diff, var_diff
 
 #******Parameters******
 num_samples = 100000
 
-layers_ex = [1,3,2,1]   # First entry is input size, has no weight
-gm_ex = [2,2,2] 	    # Number of Gaussians between each layer (len(gm_ex) = len(layers_ex)-1)
-variance_par = 1        # Variance of the Gaussian distributions
-weights_ex = generate_weights(layers_ex,num_samples,variance_par) # Generate weights for the network
-
-z_0 = torch.randn(num_samples,1,1) # Input to the network (samples x in_neurons x batch)
-
-fit = gm_fit_and_sample(z_0,gm_ex[0],num_samples) # Fit a GM to the input data
-print(f"Shape of fit: {fit.shape}") # Check the shape of the output
-
-
-res = network(z_0,layers_ex,gm_ex,weights_ex) # Compute the forward pass
-
 #******Workflow******
 #Generate Parameter arrays
-#Compute Labels (mean error ansd cov error)
+var_range = np.arange(0.1, 2.1, 0.1)   # Variance range
+width = np.arange(1, 6, 2)            # Width range
+depth = np.arange(1, 6, 2)            # Depth range
+components = np.arange(1, 11, 1)       # Number of components range
 
-#save them
-#train network/frit function
+# Assemble parameter dict
+parameter_list = []
+for var in var_range:
+    for w in width:
+        for d in depth:
+            for c in components:
+                parameter_list.append({'variance': var, 'width': w, 'depth': d, 'components': c})
+
+print(f"Number of parameter sets: {len(parameter_list)}") # Print the number of parameter sets
+exit()
+
+#Do the computation
+training_pts = [] # Initialize the list to store training points
+for parset in parameter_list:
+    start_time = time.time() # Start the timer
+    #Unpack parameters
+    variance_par = parset['variance']
+    w = parset['width']
+    d = parset['depth'] 
+    c = parset['components']
+
+    #Generate weights
+    layers = [1] + [w]*d + [1] # Add the input and output layer
+    weights = generate_weights(layers,num_samples,variance_par) # Generate weights for the network
+
+    print(layers)
+
+    #Generate input (standard Normal)
+    z_0 = torch.randn(num_samples,1,1,device=device) # Input to the network (samples x in_neurons x batch)
+
+    #Compute the forward pass
+    res = network(z_0,layers,[c]*(len(layers)-1),weights) # Compute the forward pass
+
+    #Evaluate moments
+    mean_diff, var_diff = evaluate_moments(res[0],res[1])
+
+    training_pt = torch.tensor([variance_par,w,d,c,mean_diff.item(),var_diff.item()])
+
+    training_pts.append(training_pt) # Append the training point to the list
+
+    end_time = time.time() # End the timer
+    elapsed_time = end_time - start_time # Calculate the elapsed time
+    print(f"Elapsed time for parameter set {parset}: {elapsed_time:.2f} seconds") # Print the elapsed time
+
+# Save training points to a pickle file
+output_file = "workbench/training_points.pkl"
+with open(output_file, "wb") as f:
+    pickle.dump(training_pts, f)
+print(f"Training points saved to {output_file}")
+
+
+
 
 
 
