@@ -169,7 +169,7 @@ if generate_points:
     training_pts = [] # Initialize the list to store training points
     try:
         for parset in parameter_list:
-
+            torch.manual_seed(0) 
             start_time = time.time() # Start the timer
             #Unpack parameters
             variance_par = parset['variance']
