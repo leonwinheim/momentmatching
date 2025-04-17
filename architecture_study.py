@@ -138,10 +138,10 @@ num_samples = 150000
 
 #******Workflow******
 #Generate Parameter arrays
-var_range = np.arange(0.1, 2.1, 0.5)   # Variance range
-width = np.arange(1, 6, 2)            # Width range
-depth = np.arange(1, 6, 2)            # Depth range
-components = np.arange(1, 11, 2)       # Number of components range
+var_range = np.arange(0.1, 2.1, 0.3)   # Variance range
+width = np.arange(1, 6, 1)            # Width range
+depth = np.arange(1, 6, 1)            # Depth range
+components = np.arange(1, 12, 2)       # Number of components range
 
 # Assemble parameter dict
 parameter_list = []
@@ -159,7 +159,9 @@ if os.path.exists(output_file):
     with open(output_file, "rb") as f:
         training_pts_in = pickle.load(f)
     print(f"Loaded training points from {output_file}")
+    training_pts = training_pts_in # Initialize the list to store training points
 else:
+    training_pts = [] # Initialize the list to store training points
     print(f"No existing training points file found at {output_file}")
 
 if generate_points:
