@@ -10,8 +10,8 @@ import pandas as pd
 from mpl_toolkits.mplot3d import Axes3D
 
 #******Flags******
-generate_points = True
-evaluate_points = False
+generate_points = False
+evaluate_points = True
 
 os.environ["LOKY_MAX_CPU_COUNT"] = "12"  # Limit the number of threads used by joblib, windows 11 stuff
 
@@ -228,75 +228,6 @@ if evaluate_points:
     unique_variances = df['Variance'].unique()
     print("Unique Variances:", unique_variances)
 
-    print(df)
-
-
-    # # Filter data for specific widths
-    # widths_to_plot = [1, 3, 5]
-    # plt.figure(figsize=(8, 6))
-
-    # for width in widths_to_plot:
-    #     subset = df[df['Variance'] == 0.8]
-    #     subset = subset[subset['Components'] == 1]
-    #     subset = subset[df['Width'] == width]
-    #     subset = subset.sort_values(by='Depth', ascending=True)
-    #     plt.plot(subset['Depth'], subset['Mean_Diff'], label=f'Width {width}', marker='o')
-
-    # plt.xlabel('Depth')
-    # plt.ylabel('Mean Difference')
-    # plt.title('Mean Difference vs Depth for Different Widths')
-    # plt.legend()
-    # plt.grid(True)
-
-    fig, axes = plt.subplots(2, 2, figsize=(16, 16), subplot_kw={'projection': '3d'})
-    axes = axes.flatten()  # Flatten the 2D array of axes for easier iteration
-
-    # Components to plot
-    components_to_plot = [1, 3, 5, 7]
-    variances = [0.1, 0.7, 1.3]
-    colors = ['red', 'blue', 'green', 'yellow']  # Constant colors for each variance
-
-    # Define initial view angles for each subplot
-    view_angles = [(10, 290), (10, 290), (10, 290), (10, 290)]
-    z_max = 10
-
-    for ax, specific_components, view_angle in zip(axes, components_to_plot, view_angles):
-        for var, color in zip(variances, colors):
-            subset = df[(np.isclose(df['Variance'], var, atol=1e-6)) & (df['Components'] == specific_components)]
-
-            # Pivot the data for 3D plotting
-            pivot_table = subset.pivot(index='Width', columns='Depth', values='Mean_Rel')
-
-            # Create meshgrid for plotting
-            X, Y = np.meshgrid(pivot_table.columns, pivot_table.index)
-            Z = pivot_table.values
-
-            # Plot the 3D surface
-            ax.plot_surface(X, Y, Z, color=color, edgecolor='k', alpha=0.5, label=f'Variance={var}')
-            ax.set_zlim(0, 2)
-
-            print("Errors")
-            print(f"True Mean: {subset['True_mean'].values[:]}")
-            print(f"True Variance: {subset['True_var'].values[:]}")
-            print(f"GM Man: {subset['Mean_Rel'].values[:]*subset['True_mean'].values[:]}")
-            print(f"GM Var: {subset['Var_Rel'].values[:]*subset['True_var'].values[:]}")
-            print(f"Mean Rel: {subset['Mean_Rel'].values[:]}")
-            print(f"Var Rel: {subset['Var_Rel'].values[:]}")
-
-
-        ax.set_xlabel('Depth')
-        ax.set_ylabel('Width')
-        ax.set_zlabel('Mean Difference')
-        ax.set_title(f'Mean Difference Surface Plot\n(Components={specific_components})')
-        ax.legend([f'Variance={var}' for var in variances], loc='upper left', title='Variance')
-
-        # Set the initial view angle
-        ax.view_init(elev=view_angle[0], azim=view_angle[1])
-
-    plt.tight_layout()
-    plt.show()
-
-
     fig, axes = plt.subplots(2, 2, figsize=(16, 16), subplot_kw={'projection': '3d'})
     axes = axes.flatten()  # Flatten the 2D array of axes for easier iteration
 
@@ -398,6 +329,54 @@ if evaluate_points:
 
     plt.tight_layout()
     plt.savefig("workbench/var_architecture_study_0.png", dpi=300)
+    plt.show()
+
+    # Filter data for specific depths and widths
+    depths_to_plot = [1, 2, 3, 4, 5]
+    widths_to_plot = [1, 2, 3, 4, 5]
+
+    plt.figure(figsize=(10, 8))
+
+    specified_depth = 5  # Specify the depth you want to plot
+    specified_variance = 1.3  # Specify the variance you want to plot
+    for width in widths_to_plot:
+        subset = df[(np.isclose(df['Depth'], specified_depth, atol=1e-6)) & 
+                (np.isclose(df['Width'], width, atol=1e-6)) & 
+                (np.isclose(df['Variance'], specified_variance, atol=1e-6))]
+        subset = subset.sort_values(by='Components', ascending=True)
+        plt.plot(subset['Components'], subset['Mean_Rel'], label=f'Depth={specified_depth}, Width={width}, Variance={specified_variance}', marker='o')
+
+    plt.xlabel('Components')
+    plt.ylabel('Relative Mean Error')
+    plt.ylim(0,1)
+    plt.title('Mean Error vs Components for Depth and Width (1 to 5)')
+    plt.legend()
+    plt.grid(True)
+    plt.savefig(f"workbench/mean_architecture_widths_d{specified_depth}.png", dpi=300)
+    plt.show()
+
+        # Filter data for specific depths and widths
+    depths_to_plot = [1, 2, 3, 4, 5]
+    widths_to_plot = [1, 2, 3, 4, 5]
+
+    plt.figure(figsize=(10, 8))
+
+    specified_width = 5  # Specify the width you want to plot
+    specified_variance = 1.3  # Specify the variance you want to plot
+    for depth in depths_to_plot:
+        subset = df[(np.isclose(df['Width'], specified_width, atol=1e-6)) & 
+                (np.isclose(df['Depth'], depth, atol=1e-6)) & 
+                (np.isclose(df['Variance'], specified_variance, atol=1e-6))]
+        subset = subset.sort_values(by='Components', ascending=True)
+        plt.plot(subset['Components'], subset['Mean_Rel'], label=f'Width={specified_width}, Depth={depth}, Variance={specified_variance}', marker='o')
+
+    plt.xlabel('Components')
+    plt.ylabel('Relative Mean Error')
+    plt.ylim(0,1)
+    plt.title('Mean Error vs Components for Width and Depth (1 to 5)')
+    plt.legend()
+    plt.grid(True)
+    plt.savefig(f"workbench/mean_architecture_depths_w{specified_width}.png", dpi=300)
     plt.show()
 
     print(f"Shape of training points: {len(training_pts_in)}")
