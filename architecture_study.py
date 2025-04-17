@@ -221,8 +221,15 @@ if evaluate_points:
     data = torch.stack(training_pts_in)
 
     # Create a DataFrame for correlation analysis
-    columns = ['Variance', 'Width', 'Depth', 'Components', 'Mean_Rel','Var_Rel', 'True_Mean', 'True_Var']
-    df = pd.DataFrame(data[:,:-1].cpu().numpy(), columns=columns)
+    columns = ['Variance', 'Width', 'Depth', 'Components', 'Mean_Rel','Var_Rel', 'True_mean', 'True_var']
+    df = pd.DataFrame(data.cpu().numpy(), columns=columns)
+
+    # Print unique variances
+    unique_variances = df['Variance'].unique()
+    print("Unique Variances:", unique_variances)
+
+    print(df)
+
 
     # # Filter data for specific widths
     # widths_to_plot = [1, 3, 5]
@@ -246,7 +253,7 @@ if evaluate_points:
 
     # Components to plot
     components_to_plot = [1, 3, 5, 7]
-    variances = [0.2, 0.6, 1.0, 1.6]
+    variances = [0.1, 0.7, 1.3]
     colors = ['red', 'blue', 'green', 'yellow']  # Constant colors for each variance
 
     # Define initial view angles for each subplot
@@ -255,18 +262,27 @@ if evaluate_points:
 
     for ax, specific_components, view_angle in zip(axes, components_to_plot, view_angles):
         for var, color in zip(variances, colors):
-            subset = df[(df['Variance'] == var) & (df['Components'] == specific_components)]
+            subset = df[(np.isclose(df['Variance'], var, atol=1e-6)) & (df['Components'] == specific_components)]
 
             # Pivot the data for 3D plotting
-            pivot_table = subset.pivot(index='Width', columns='Depth', values='Mean_Diff')
+            pivot_table = subset.pivot(index='Width', columns='Depth', values='Mean_Rel')
 
             # Create meshgrid for plotting
             X, Y = np.meshgrid(pivot_table.columns, pivot_table.index)
             Z = pivot_table.values
 
             # Plot the 3D surface
-            ax.plot_surface(X, Y, Z, color=color, edgecolor='k', alpha=0.8, label=f'Variance={var}')
-            ax.set_zlim(0, z_max)
+            ax.plot_surface(X, Y, Z, color=color, edgecolor='k', alpha=0.5, label=f'Variance={var}')
+            ax.set_zlim(0, 2)
+
+            print("Errors")
+            print(f"True Mean: {subset['True_mean'].values[:]}")
+            print(f"True Variance: {subset['True_var'].values[:]}")
+            print(f"GM Man: {subset['Mean_Rel'].values[:]*subset['True_mean'].values[:]}")
+            print(f"GM Var: {subset['Var_Rel'].values[:]*subset['True_var'].values[:]}")
+            print(f"Mean Rel: {subset['Mean_Rel'].values[:]}")
+            print(f"Var Rel: {subset['Var_Rel'].values[:]}")
+
 
         ax.set_xlabel('Depth')
         ax.set_ylabel('Width')
@@ -280,6 +296,109 @@ if evaluate_points:
     plt.tight_layout()
     plt.show()
 
+
+    fig, axes = plt.subplots(2, 2, figsize=(16, 16), subplot_kw={'projection': '3d'})
+    axes = axes.flatten()  # Flatten the 2D array of axes for easier iteration
+
+    # Variances to plot
+    variances_to_plot = [0.1, 0.7, 1.3, 1.9]
+    components = [1, 3, 5, 9]
+    colors = ['red', 'blue', 'green', 'yellow']  # Constant colors for each component
+
+    # Define initial view angles for each subplot
+    angle_a = 220
+    angle_b = 5
+    view_angles = [(angle_b, angle_a), (angle_b, angle_a), (angle_b, angle_a), (angle_b, angle_a)]
+    z_max = 10
+
+    for ax, specific_variance, view_angle in zip(axes, variances_to_plot, view_angles):
+        for comp, color in zip(components, colors):
+            subset = df[(np.isclose(df['Variance'], specific_variance, atol=1e-6)) & (df['Components'] == comp)]
+
+            # Pivot the data for 3D plotting
+            pivot_table = subset.pivot(index='Width', columns='Depth', values='Mean_Rel')
+
+            # Create meshgrid for plotting
+            X, Y = np.meshgrid(pivot_table.columns, pivot_table.index)
+            Z = pivot_table.values
+
+            # Plot the 3D surface
+            ax.plot_surface(X, Y, Z, color=color, edgecolor='k', alpha=0.5, label=f'Components={comp}')
+            ax.set_zlim(0, 1)
+
+            print("Errors")
+            print(f"True Mean: {subset['True_mean'].values[:]}")
+            print(f"True Variance: {subset['True_var'].values[:]}")
+            print(f"GM Man: {subset['Mean_Rel'].values[:]*subset['True_mean'].values[:]}")
+            print(f"GM Var: {subset['Var_Rel'].values[:]*subset['True_var'].values[:]}")
+            print(f"Mean Rel: {subset['Mean_Rel'].values[:]}")
+            print(f"Var Rel: {subset['Var_Rel'].values[:]}")
+
+
+        ax.set_xlabel('Depth')
+        ax.set_ylabel('Width')
+        ax.set_zlabel('Rel. Mean Error')
+        ax.set_title(f'Mean Error Surface Plot\n(Variance={specific_variance})')
+        ax.legend([f'Components={comp}' for comp in components], loc='upper left', title='Components')
+
+        # Set the initial view angle
+        ax.view_init(elev=view_angle[0], azim=view_angle[1])
+
+    plt.tight_layout()
+    plt.savefig("workbench/mean_architecture_study_0.png", dpi=300)
+    plt.show()
+
+
+    fig, axes = plt.subplots(2, 2, figsize=(16, 16), subplot_kw={'projection': '3d'})
+    axes = axes.flatten()  # Flatten the 2D array of axes for easier iteration
+
+    # Variances to plot
+    variances_to_plot = [0.1, 0.7, 1.3, 1.9]
+    components = [1, 3, 5, 9]
+    colors = ['red', 'blue', 'green', 'yellow']  # Constant colors for each component
+
+    # Define initial view angles for each subplot
+    angle_a = 220
+    angle_b = 5
+    view_angles = [(angle_b, angle_a), (angle_b, angle_a), (angle_b, angle_a), (angle_b, angle_a)]
+    z_max = 10
+
+    for ax, specific_variance, view_angle in zip(axes, variances_to_plot, view_angles):
+        for comp, color in zip(components, colors):
+            subset = df[(np.isclose(df['Variance'], specific_variance, atol=1e-6)) & (df['Components'] == comp)]
+
+            # Pivot the data for 3D plotting
+            pivot_table = subset.pivot(index='Width', columns='Depth', values='Var_Rel')
+
+            # Create meshgrid for plotting
+            X, Y = np.meshgrid(pivot_table.columns, pivot_table.index)
+            Z = pivot_table.values
+
+            # Plot the 3D surface
+            ax.plot_surface(X, Y, Z, color=color, edgecolor='k', alpha=0.5, label=f'Components={comp}')
+            ax.set_zlim(0, 1)
+
+            print("Errors")
+            print(f"True Mean: {subset['True_mean'].values[:]}")
+            print(f"True Variance: {subset['True_var'].values[:]}")
+            print(f"GM Man: {subset['Mean_Rel'].values[:]*subset['True_mean'].values[:]}")
+            print(f"GM Var: {subset['Var_Rel'].values[:]*subset['True_var'].values[:]}")
+            print(f"Mean Rel: {subset['Mean_Rel'].values[:]}")
+            print(f"Var Rel: {subset['Var_Rel'].values[:]}")
+
+
+        ax.set_xlabel('Depth')
+        ax.set_ylabel('Width')
+        ax.set_zlabel('Rel. Var Error')
+        ax.set_title(f'Var Error Surface Plot\n(Variance={specific_variance})')
+        ax.legend([f'Components={comp}' for comp in components], loc='upper left', title='Components')
+
+        # Set the initial view angle
+        ax.view_init(elev=view_angle[0], azim=view_angle[1])
+
+    plt.tight_layout()
+    plt.savefig("workbench/var_architecture_study_0.png", dpi=300)
+    plt.show()
 
     print(f"Shape of training points: {len(training_pts_in)}")
 
