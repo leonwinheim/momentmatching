@@ -10,8 +10,9 @@ import pandas as pd
 from mpl_toolkits.mplot3d import Axes3D
 
 #******Flags******
-generate_points = False
-evaluate_points = True
+generate_points = True
+evaluate_points = False
+single_run = False
 
 os.environ["LOKY_MAX_CPU_COUNT"] = "12"  # Limit the number of threads used by joblib, windows 11 stuff
 
@@ -32,7 +33,7 @@ else:
 #******Define Functions******
 def act(x):
     """Return Relu or Leaky Relu"""
-    leaky = False
+    leaky = True
     leaky_slope = 0.05
     if leaky:
         x = torch.where(x > 0, x, x * leaky_slope)
@@ -88,18 +89,28 @@ def network(z_0,layers,gm_comp, weights,single_run=False):
         return z,z_gm
 
     else:
+        #Save intermediate values
+        z_hist = []
+        z_gm_hist = []
+
         # Compute the forward pass
         z = z_0
         z_gm = z_0 
+
+        z_hist.append(z)
+        z_gm_hist.append(z_gm)
+
         for i in range(len(layers)-1):
             #print(f" Pass layer with {layers[i]} neurons to layer with {layers[i+1]} neurons")
             z = single_layer_pass(z, weights[i].to(device))
+            z_hist.append(z)
 
             z_gm = gm_fit_and_sample(z_gm,gm_comp[i],z.shape[0]) # Fit and sample the GM
 
             z_gm = single_layer_pass(z_gm,weights[i]) 
+            z_gm_hist.append(z_gm)
         
-        return z,z_gm
+        return z,z_gm,z_hist,z_gm_hist
 
 def gm_fit_and_sample(z,components,num_samples):
     """Take a sample based distribution and fit a GM to it.
@@ -134,35 +145,36 @@ def evaluate_moments(z,z_gm):
     return mean_rel, var_rel, mean, var
 
 #******Parameters******
-num_samples = 150000
+num_samples = 100000
 
 #******Workflow******
-#Generate Parameter arrays
-var_range = np.arange(0.1, 2.1, 0.3)   # Variance range
-width = np.arange(1, 6, 1)            # Width range
-depth = np.arange(1, 6, 1)            # Depth range
-components = np.arange(1, 12, 2)       # Number of components range
+if generate_points or evaluate_points:
+    #Generate Parameter arrays
+    var_range = np.array([0.1,0.5,1.0,1.5,2.0])     # Variance range
+    width = np.array([1, 3, 5])                     # Width range
+    depth = np.array([1, 3, 5])                     # Depth range
+    components = np.array([1, 3, 5, 7, 9])          # Number of components range
 
-# Assemble parameter dict
-parameter_list = []
-for var in var_range:
-    for w in width:
-        for d in depth:
-            for c in components:
-                parameter_list.append({'variance': var, 'width': w, 'depth': d, 'components': c})
+    # Assemble parameter dict
+    parameter_list = []
+    for var in var_range:
+        for w in width:
+            for d in depth:
+                for c in components:
+                    parameter_list.append({'variance': var, 'width': w, 'depth': d, 'components': c})
 
-print(f"Number of parameter sets: {len(parameter_list)}") # Print the number of parameter sets
+    print(f"Number of parameter sets: {len(parameter_list)}") # Print the number of parameter sets
 
-# Check if the pickle file exists
-output_file = f"workbench/training_points_{num_samples}.pkl"
-if os.path.exists(output_file):
-    with open(output_file, "rb") as f:
-        training_pts_in = pickle.load(f)
-    print(f"Loaded training points from {output_file}")
-    training_pts = training_pts_in # Initialize the list to store training points
-else:
-    training_pts = [] # Initialize the list to store training points
-    print(f"No existing training points file found at {output_file}")
+    # Check if the pickle file exists
+    output_file = f"workbench/training_points_{num_samples}.pkl"
+    if os.path.exists(output_file):
+        with open(output_file, "rb") as f:
+            training_pts_in = pickle.load(f)
+        print(f"Loaded training points from {output_file}")
+        training_pts = training_pts_in # Initialize the list to store training points
+    else:
+        training_pts = [] # Initialize the list to store training points
+        print(f"No existing training points file found at {output_file}")
 
 if generate_points:
     #Do the computation
@@ -215,7 +227,6 @@ if generate_points:
         pickle.dump(training_pts, f)
     print(f"Training points saved to {output_file}")
 
-
 if evaluate_points:
     # Structure: [variance, width, depth, components, mean_diff, var_diff, true_mean, true_var]
     data = torch.stack(training_pts_in)
@@ -228,6 +239,7 @@ if evaluate_points:
     unique_variances = df['Variance'].unique()
     print("Unique Variances:", unique_variances)
 
+    #******Do the Mean Surface plot******
     fig, axes = plt.subplots(2, 2, figsize=(16, 16), subplot_kw={'projection': '3d'})
     axes = axes.flatten()  # Flatten the 2D array of axes for easier iteration
 
@@ -277,9 +289,8 @@ if evaluate_points:
 
     plt.tight_layout()
     plt.savefig("workbench/mean_architecture_study_0.png", dpi=300)
-    plt.show()
 
-
+    #****** Do the Var surface Plots
     fig, axes = plt.subplots(2, 2, figsize=(16, 16), subplot_kw={'projection': '3d'})
     axes = axes.flatten()  # Flatten the 2D array of axes for easier iteration
 
@@ -329,59 +340,100 @@ if evaluate_points:
 
     plt.tight_layout()
     plt.savefig("workbench/var_architecture_study_0.png", dpi=300)
-    plt.show()
 
     # Filter data for specific depths and widths
     depths_to_plot = [1, 2, 3, 4, 5]
     widths_to_plot = [1, 2, 3, 4, 5]
 
-    plt.figure(figsize=(10, 8))
-
-    specified_depth = 5  # Specify the depth you want to plot
+    #******Create Plot for widths******
     specified_variance = 1.3  # Specify the variance you want to plot
-    for width in widths_to_plot:
-        subset = df[(np.isclose(df['Depth'], specified_depth, atol=1e-6)) & 
-                (np.isclose(df['Width'], width, atol=1e-6)) & 
-                (np.isclose(df['Variance'], specified_variance, atol=1e-6))]
-        subset = subset.sort_values(by='Components', ascending=True)
-        plt.plot(subset['Components'], subset['Mean_Rel'], label=f'Depth={specified_depth}, Width={width}, Variance={specified_variance}', marker='o')
 
-    plt.xlabel('Components')
-    plt.ylabel('Relative Mean Error')
-    plt.ylim(0,1)
-    plt.title('Mean Error vs Components for Depth and Width (1 to 5)')
-    plt.legend()
-    plt.grid(True)
-    plt.savefig(f"workbench/mean_architecture_widths_d{specified_depth}.png", dpi=300)
-    plt.show()
+    for specified_depth in depths_to_plot:
+        plt.figure(figsize=(10, 8))
+
+        for width in widths_to_plot:
+            subset = df[(np.isclose(df['Depth'], specified_depth, atol=1e-6)) & 
+                    (np.isclose(df['Width'], width, atol=1e-6)) & 
+                    (np.isclose(df['Variance'], specified_variance, atol=1e-6))]
+            subset = subset.sort_values(by='Components', ascending=True)
+            plt.plot(subset['Components'], subset['Mean_Rel'], label=f'Depth={specified_depth}, Width={width}, Variance={specified_variance}', marker='o')
+
+        plt.xlabel('Components')
+        plt.ylabel('Relative Mean Error')
+        plt.ylim(0,1)
+        plt.title('Mean Error vs Components for Depth and Width (1 to 5)')
+        plt.legend()
+        plt.grid(True)
+        plt.savefig(f"workbench/mean_architecture_widths_d{specified_depth}_v{specified_variance}.png", dpi=300)
 
         # Filter data for specific depths and widths
     depths_to_plot = [1, 2, 3, 4, 5]
     widths_to_plot = [1, 2, 3, 4, 5]
 
-    plt.figure(figsize=(10, 8))
-
-    specified_width = 5  # Specify the width you want to plot
+    #Create plots for depths
     specified_variance = 1.3  # Specify the variance you want to plot
-    for depth in depths_to_plot:
-        subset = df[(np.isclose(df['Width'], specified_width, atol=1e-6)) & 
-                (np.isclose(df['Depth'], depth, atol=1e-6)) & 
-                (np.isclose(df['Variance'], specified_variance, atol=1e-6))]
-        subset = subset.sort_values(by='Components', ascending=True)
-        plt.plot(subset['Components'], subset['Mean_Rel'], label=f'Width={specified_width}, Depth={depth}, Variance={specified_variance}', marker='o')
 
-    plt.xlabel('Components')
-    plt.ylabel('Relative Mean Error')
-    plt.ylim(0,1)
-    plt.title('Mean Error vs Components for Width and Depth (1 to 5)')
-    plt.legend()
-    plt.grid(True)
-    plt.savefig(f"workbench/mean_architecture_depths_w{specified_width}.png", dpi=300)
-    plt.show()
+    for specified_width in widths_to_plot:
+        plt.figure(figsize=(10, 8))
+        for depth in depths_to_plot:
+            subset = df[(np.isclose(df['Width'], specified_width, atol=1e-6)) & 
+                    (np.isclose(df['Depth'], depth, atol=1e-6)) & 
+                    (np.isclose(df['Variance'], specified_variance, atol=1e-6))]
+            subset = subset.sort_values(by='Components', ascending=True)
+            plt.plot(subset['Components'], subset['Mean_Rel'], label=f'Width={specified_width}, Depth={depth}, Variance={specified_variance}', marker='o')
+
+        plt.xlabel('Components')
+        plt.ylabel('Relative Mean Error')
+        plt.ylim(0,1)
+        plt.title('Mean Error vs Components for Width and Depth (1 to 5)')
+        plt.legend()
+        plt.grid(True)
+        plt.savefig(f"workbench/mean_architecture_depths_w{specified_width}_v{specified_variance}.png", dpi=300)
 
     print(f"Shape of training points: {len(training_pts_in)}")
 
+if single_run:
+    # Set Parametrrs
+    var =1.3
+    width = 3
+    depth = 3
+    components = 5
 
+    layers = [1] + [width]*depth + [1] # Add the input and output layer
+    weights = generate_weights(layers,num_samples,var) # Generate weights for the network
+    #Generate input (standard Normal)
+    z_0 = torch.randn(num_samples,1,1,device=device) # Input to the network (samples x in_neurons x batch)
 
+    _,_,z_hist,z_gm_hist = network(z_0,layers,[components]*(len(layers)-1),weights,single_run=True) # Compute the forward pass
 
+    #******Viualize******
+    # Initialize a plot with depth plots stacked on top of each other
+    fig, axes = plt.subplots(len(z_hist), 1, figsize=(10, 5 * len(z_hist)))
 
+    # Ensure axes is iterable even if there's only one subplot
+    if len(z_hist) == 1:
+        axes = [axes]
+
+    # Plot KDE for each depth
+    for i, (z, z_gm, ax) in enumerate(zip(z_hist, z_gm_hist, axes)):
+        # Choose which parameter to plot
+        z = z[:,0,0]
+        z_flat = z.numpy().flatten()  # Flatten the tensor for KDE
+        sns.kdeplot(z_flat, ax=ax, fill=True, color="blue", alpha=0.5, label=f"z_hist, mean: {np.mean(z_flat):.4f}", bw_adjust=0.2)
+        #ax.scatter(z_flat, np.zeros_like(z_flat), color="blue", alpha=0.5, s=50, label="z_hist points")
+
+        z_gm = z_gm[:,0,0]
+        z_gm_flat = z_gm.numpy().flatten()  # Flatten the tensor for KDE
+        sns.kdeplot(z_gm_flat, ax=ax, fill=True, color="orange", alpha=0.5, label=f"z_gm_hist, mean: {np.mean(z_gm_flat):.4f}", bw_adjust=0.1)
+        #ax.scatter(z_gm_flat, np.zeros_like(z_gm_flat), color="orange", alpha=0.5, s=50, label="z_gm_hist points")
+
+        ax.set_title(f"KDE of z_hist[{i}] and z_gm_hist[{i}] (Layer {i+1})")
+        ax.set_xlabel("Value")
+        ax.set_ylabel("Density")
+        if not i == 0:
+            ax.set_xlim(ax.get_xlim()[0] * 0.1, ax.get_xlim()[1] * 0.1)
+        ax.legend()
+        ax.grid(True)
+
+    plt.tight_layout()
+    plt.savefig("workbench/kde_z_hist_with_gm.png", dpi=300)
