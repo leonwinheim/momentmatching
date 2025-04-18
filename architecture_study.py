@@ -10,9 +10,9 @@ import pandas as pd
 from mpl_toolkits.mplot3d import Axes3D
 
 #******Flags******
-generate_points = True
+generate_points = False
 evaluate_points = False
-single_run = False
+single_run = True
 
 os.environ["LOKY_MAX_CPU_COUNT"] = "12"  # Limit the number of threads used by joblib, windows 11 stuff
 
@@ -145,7 +145,7 @@ def evaluate_moments(z,z_gm):
     return mean_rel, var_rel, mean, var
 
 #******Parameters******
-num_samples = 100000
+num_samples = 150000
 
 #******Workflow******
 if generate_points or evaluate_points:
@@ -244,7 +244,7 @@ if evaluate_points:
     axes = axes.flatten()  # Flatten the 2D array of axes for easier iteration
 
     # Variances to plot
-    variances_to_plot = [0.1, 0.7, 1.3, 1.9]
+    variances_to_plot = [0.1, 0.5, 1.0, 1.5]
     components = [1, 3, 5, 9]
     colors = ['red', 'blue', 'green', 'yellow']  # Constant colors for each component
 
@@ -295,7 +295,7 @@ if evaluate_points:
     axes = axes.flatten()  # Flatten the 2D array of axes for easier iteration
 
     # Variances to plot
-    variances_to_plot = [0.1, 0.7, 1.3, 1.9]
+    variances_to_plot = [0.1, 0.5, 1.0, 1.5]
     components = [1, 3, 5, 9]
     colors = ['red', 'blue', 'green', 'yellow']  # Constant colors for each component
 
@@ -342,11 +342,11 @@ if evaluate_points:
     plt.savefig("workbench/var_architecture_study_0.png", dpi=300)
 
     # Filter data for specific depths and widths
-    depths_to_plot = [1, 2, 3, 4, 5]
-    widths_to_plot = [1, 2, 3, 4, 5]
+    depths_to_plot = [1, 3, 5]
+    widths_to_plot = [1, 3, 5]
 
     #******Create Plot for widths******
-    specified_variance = 1.3  # Specify the variance you want to plot
+    specified_variance = 1.0  # Specify the variance you want to plot
 
     for specified_depth in depths_to_plot:
         plt.figure(figsize=(10, 8))
@@ -367,11 +367,11 @@ if evaluate_points:
         plt.savefig(f"workbench/mean_architecture_widths_d{specified_depth}_v{specified_variance}.png", dpi=300)
 
         # Filter data for specific depths and widths
-    depths_to_plot = [1, 2, 3, 4, 5]
-    widths_to_plot = [1, 2, 3, 4, 5]
+    depths_to_plot = [1, 3, 5]
+    widths_to_plot = [1, 3, 5]
 
     #Create plots for depths
-    specified_variance = 1.3  # Specify the variance you want to plot
+    specified_variance = 1.0  # Specify the variance you want to plot
 
     for specified_width in widths_to_plot:
         plt.figure(figsize=(10, 8))
@@ -394,10 +394,10 @@ if evaluate_points:
 
 if single_run:
     # Set Parametrrs
-    var =1.3
+    var =1.0
     width = 3
     depth = 3
-    components = 5
+    components = 2
 
     layers = [1] + [width]*depth + [1] # Add the input and output layer
     weights = generate_weights(layers,num_samples,var) # Generate weights for the network
