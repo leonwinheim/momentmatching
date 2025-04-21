@@ -95,19 +95,20 @@ def network(z_0,layers,gm_comp, weights,single_run=False):
 
         # Compute the forward pass
         z = z_0
-        z_gm = z_0 
+        z_gm = z_0
 
         z_hist.append(z)
         z_gm_hist.append(z_gm)
+        
 
         for i in range(len(layers)-1):
             #print(f" Pass layer with {layers[i]} neurons to layer with {layers[i+1]} neurons")
             z = single_layer_pass(z, weights[i].to(device))
             z_hist.append(z)
 
-            z_gm = gm_fit_and_sample(z_gm,gm_comp[i],z.shape[0]) # Fit and sample the GM
-
             z_gm = single_layer_pass(z_gm,weights[i]) 
+
+            z_gm = gm_fit_and_sample(z_gm,gm_comp[i],z.shape[0]) # Fit and sample the GM
             z_gm_hist.append(z_gm)
         
         return z,z_gm,z_hist,z_gm_hist
@@ -150,10 +151,11 @@ num_samples = 150000
 #******Workflow******
 if generate_points or evaluate_points:
     #Generate Parameter arrays
-    var_range = np.array([0.1,0.5,1.0,1.5,2.0])     # Variance range
+    var_range = np.array([0.1,0.5,1.0,1.5])     # Variance range
     width = np.array([1, 3, 5])                     # Width range
     depth = np.array([1, 3, 5])                     # Depth range
-    components = np.array([1, 3, 5, 7, 9])          # Number of components range
+    #components = np.array([1, 3, 5, 7, 9])          # Number of components range
+    components = np.array([15])          # Number of components range
 
     # Assemble parameter dict
     parameter_list = []
@@ -178,7 +180,7 @@ if generate_points or evaluate_points:
 
 if generate_points:
     #Do the computation
-    training_pts = [] # Initialize the list to store training points
+    #training_pts = [] # Initialize the list to store training points
     try:
         for parset in parameter_list:
             torch.manual_seed(0) 
@@ -245,8 +247,8 @@ if evaluate_points:
 
     # Variances to plot
     variances_to_plot = [0.1, 0.5, 1.0, 1.5]
-    components = [1, 3, 5, 9]
-    colors = ['red', 'blue', 'green', 'yellow']  # Constant colors for each component
+    components = [1, 3, 5, 9, 15]
+    colors = ['red', 'blue', 'green', 'yellow','purple']  # Constant colors for each component
 
     # Define initial view angles for each subplot
     angle_a = 220
@@ -269,13 +271,15 @@ if evaluate_points:
             ax.plot_surface(X, Y, Z, color=color, edgecolor='k', alpha=0.5, label=f'Components={comp}')
             ax.set_zlim(0, 1)
 
-            print("Errors")
-            print(f"True Mean: {subset['True_mean'].values[:]}")
-            print(f"True Variance: {subset['True_var'].values[:]}")
-            print(f"GM Man: {subset['Mean_Rel'].values[:]*subset['True_mean'].values[:]}")
-            print(f"GM Var: {subset['Var_Rel'].values[:]*subset['True_var'].values[:]}")
-            print(f"Mean Rel: {subset['Mean_Rel'].values[:]}")
-            print(f"Var Rel: {subset['Var_Rel'].values[:]}")
+            print(f"Components: {comp}")
+
+            # print("Errors")
+            # print(f"True Mean: {subset['True_mean'].values[:]}")
+            # print(f"True Variance: {subset['True_var'].values[:]}")
+            # print(f"GM Man: {subset['Mean_Rel'].values[:]*subset['True_mean'].values[:]}")
+            # print(f"GM Var: {subset['Var_Rel'].values[:]*subset['True_var'].values[:]}")
+            # print(f"Mean Rel: {subset['Mean_Rel'].values[:]}")
+            # print(f"Var Rel: {subset['Var_Rel'].values[:]}")
 
 
         ax.set_xlabel('Depth')
@@ -296,8 +300,8 @@ if evaluate_points:
 
     # Variances to plot
     variances_to_plot = [0.1, 0.5, 1.0, 1.5]
-    components = [1, 3, 5, 9]
-    colors = ['red', 'blue', 'green', 'yellow']  # Constant colors for each component
+    components = [1, 3, 5, 9, 15]
+    colors = ['red', 'blue', 'green', 'yellow','purple']  # Constant colors for each component
 
     # Define initial view angles for each subplot
     angle_a = 220
@@ -394,10 +398,10 @@ if evaluate_points:
 
 if single_run:
     # Set Parametrrs
-    var =1.0
-    width = 3
-    depth = 3
-    components = 2
+    var = 1.0
+    width = 2
+    depth = 2
+    components = 15
 
     layers = [1] + [width]*depth + [1] # Add the input and output layer
     weights = generate_weights(layers,num_samples,var) # Generate weights for the network
@@ -419,19 +423,19 @@ if single_run:
         # Choose which parameter to plot
         z = z[:,0,0]
         z_flat = z.numpy().flatten()  # Flatten the tensor for KDE
-        sns.kdeplot(z_flat, ax=ax, fill=True, color="blue", alpha=0.5, label=f"z_hist, mean: {np.mean(z_flat):.4f}", bw_adjust=0.2)
+        sns.kdeplot(z_flat, ax=ax, fill=True, color="blue", alpha=0.5, label=f"z_hist, mean: {np.mean(z_flat):.4f}", bw_adjust=2)
         #ax.scatter(z_flat, np.zeros_like(z_flat), color="blue", alpha=0.5, s=50, label="z_hist points")
 
         z_gm = z_gm[:,0,0]
         z_gm_flat = z_gm.numpy().flatten()  # Flatten the tensor for KDE
-        sns.kdeplot(z_gm_flat, ax=ax, fill=True, color="orange", alpha=0.5, label=f"z_gm_hist, mean: {np.mean(z_gm_flat):.4f}", bw_adjust=0.1)
+        sns.kdeplot(z_gm_flat, ax=ax, fill=True, color="orange", alpha=0.5, label=f"z_gm_hist, mean: {np.mean(z_gm_flat):.4f}", bw_adjust=2)
         #ax.scatter(z_gm_flat, np.zeros_like(z_gm_flat), color="orange", alpha=0.5, s=50, label="z_gm_hist points")
 
         ax.set_title(f"KDE of z_hist[{i}] and z_gm_hist[{i}] (Layer {i+1})")
         ax.set_xlabel("Value")
         ax.set_ylabel("Density")
-        if not i == 0:
-            ax.set_xlim(ax.get_xlim()[0] * 0.1, ax.get_xlim()[1] * 0.1)
+        # if not i == 0:
+        #     ax.set_xlim(ax.get_xlim()[0] * 0.1, ax.get_xlim()[1] * 0.1)
         ax.legend()
         ax.grid(True)
 
