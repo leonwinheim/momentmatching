@@ -11,8 +11,8 @@ from mpl_toolkits.mplot3d import Axes3D
 
 #******Flags******
 generate_points = False
-evaluate_points = False
-single_run = True
+evaluate_points = True
+single_run = False
 
 os.environ["LOKY_MAX_CPU_COUNT"] = "12"  # Limit the number of threads used by joblib, windows 11 stuff
 
@@ -28,7 +28,7 @@ else:
 
 #ALL COMPUTATIONS HERE ARE WITHOUT BIAS
 
-#Kann ich das selbe GMM mehrmal fitten???
+#Kann ich das selbe GMM mehrmal fitten??? Ja kann ich
 
 #******Define Functions******
 def act(x):
@@ -151,11 +151,11 @@ num_samples = 150000
 #******Workflow******
 if generate_points or evaluate_points:
     #Generate Parameter arrays
-    var_range = np.array([0.1,0.5,1.0,1.5])     # Variance range
-    width = np.array([1, 3, 5])                     # Width range
-    depth = np.array([1, 3, 5])                     # Depth range
+    var_range = np.array([1.0])     # Variance range
+    width = np.array([1, 2, 5, 10, 20, 30])                     # Width range
+    depth = np.array([1, 3, 5, 10, 20, 30])                     # Depth range
     #components = np.array([1, 3, 5, 7, 9])          # Number of components range
-    components = np.array([15])          # Number of components range
+    components = np.array([1,2,5,10,15])          # Number of components range
 
     # Assemble parameter dict
     parameter_list = []
@@ -183,8 +183,12 @@ if generate_points:
     #training_pts = [] # Initialize the list to store training points
     try:
         for parset in parameter_list:
+            #Reset seed for reproducibility
             torch.manual_seed(0) 
-            start_time = time.time() # Start the timer
+
+            # Start the timer
+            start_time = time.time()
+
             #Unpack parameters
             variance_par = parset['variance']
             w = parset['width']
@@ -345,9 +349,11 @@ if evaluate_points:
     plt.tight_layout()
     plt.savefig("workbench/var_architecture_study_0.png", dpi=300)
 
+    plt.show()
+    
     # Filter data for specific depths and widths
-    depths_to_plot = [1, 3, 5]
-    widths_to_plot = [1, 3, 5]
+    depths_to_plot = [1, 3, 5 , 10, 20, 30]
+    widths_to_plot = [1, 3, 5 , 10, 20, 30]
 
     #******Create Plot for widths******
     specified_variance = 1.0  # Specify the variance you want to plot
@@ -371,8 +377,8 @@ if evaluate_points:
         plt.savefig(f"workbench/mean_architecture_widths_d{specified_depth}_v{specified_variance}.png", dpi=300)
 
         # Filter data for specific depths and widths
-    depths_to_plot = [1, 3, 5]
-    widths_to_plot = [1, 3, 5]
+    depths_to_plot = [1, 3, 5 , 10, 20, 30]
+    widths_to_plot = [1, 3, 5 , 10, 20, 30]
 
     #Create plots for depths
     specified_variance = 1.0  # Specify the variance you want to plot
@@ -398,10 +404,11 @@ if evaluate_points:
 
 if single_run:
     # Set Parametrrs
+    num_samples = 150000
     var = 1.0
     width = 2
     depth = 2
-    components = 15
+    components = 4
 
     layers = [1] + [width]*depth + [1] # Add the input and output layer
     weights = generate_weights(layers,num_samples,var) # Generate weights for the network
