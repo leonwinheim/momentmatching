@@ -153,7 +153,7 @@ if generate_points or evaluate_points:
     #Generate Parameter arrays
     var_range = np.array([1.0])     # Variance range
     width = np.array([1, 2, 5, 10, 20, 30])                     # Width range
-    depth = np.array([1, 3, 5, 10, 20, 30])                     # Depth range
+    depth = np.array([1, 3, 5, 10])                     # Depth range
     #components = np.array([1, 3, 5, 7, 9])          # Number of components range
     components = np.array([1,2,5,10,15])          # Number of components range
 
@@ -241,166 +241,199 @@ if evaluate_points:
     columns = ['Variance', 'Width', 'Depth', 'Components', 'Mean_Rel','Var_Rel', 'True_mean', 'True_var']
     df = pd.DataFrame(data.cpu().numpy(), columns=columns)
 
-    # Print unique variances
-    unique_variances = df['Variance'].unique()
-    print("Unique Variances:", unique_variances)
+    # # Print unique variances
+    # unique_variances = df['Variance'].unique()
+    # print("Unique Variances:", unique_variances)
 
-    #******Do the Mean Surface plot******
-    fig, axes = plt.subplots(2, 2, figsize=(16, 16), subplot_kw={'projection': '3d'})
-    axes = axes.flatten()  # Flatten the 2D array of axes for easier iteration
+    # #******Do the Mean Surface plot******
+    # fig, axes = plt.subplots(2, 2, figsize=(16, 16), subplot_kw={'projection': '3d'})
+    # axes = axes.flatten()  # Flatten the 2D array of axes for easier iteration
 
-    # Variances to plot
-    variances_to_plot = [0.1, 0.5, 1.0, 1.5]
-    components = [1, 3, 5, 9, 15]
-    colors = ['red', 'blue', 'green', 'yellow','purple']  # Constant colors for each component
+    # # Variances to plot
+    # variances_to_plot = [0.1, 0.5, 1.0, 1.5]
+    # components = [1, 3, 5, 9, 15]
+    # colors = ['red', 'blue', 'green', 'yellow','purple']  # Constant colors for each component
 
-    # Define initial view angles for each subplot
-    angle_a = 220
-    angle_b = 5
-    view_angles = [(angle_b, angle_a), (angle_b, angle_a), (angle_b, angle_a), (angle_b, angle_a)]
-    z_max = 10
+    # # Define initial view angles for each subplot
+    # angle_a = 220
+    # angle_b = 5
+    # view_angles = [(angle_b, angle_a), (angle_b, angle_a), (angle_b, angle_a), (angle_b, angle_a)]
+    # z_max = 10
 
-    for ax, specific_variance, view_angle in zip(axes, variances_to_plot, view_angles):
-        for comp, color in zip(components, colors):
-            subset = df[(np.isclose(df['Variance'], specific_variance, atol=1e-6)) & (df['Components'] == comp)]
+    # for ax, specific_variance, view_angle in zip(axes, variances_to_plot, view_angles):
+    #     for comp, color in zip(components, colors):
+    #         subset = df[(np.isclose(df['Variance'], specific_variance, atol=1e-6)) & (df['Components'] == comp)]
 
-            # Pivot the data for 3D plotting
-            pivot_table = subset.pivot(index='Width', columns='Depth', values='Mean_Rel')
+    #         # Pivot the data for 3D plotting
+    #         pivot_table = subset.pivot(index='Width', columns='Depth', values='Mean_Rel')
 
-            # Create meshgrid for plotting
-            X, Y = np.meshgrid(pivot_table.columns, pivot_table.index)
-            Z = pivot_table.values
+    #         # Create meshgrid for plotting
+    #         X, Y = np.meshgrid(pivot_table.columns, pivot_table.index)
+    #         Z = pivot_table.values
 
-            # Plot the 3D surface
-            ax.plot_surface(X, Y, Z, color=color, edgecolor='k', alpha=0.5, label=f'Components={comp}')
-            ax.set_zlim(0, 1)
+    #         # Plot the 3D surface
+    #         ax.plot_surface(X, Y, Z, color=color, edgecolor='k', alpha=0.5, label=f'Components={comp}')
+    #         ax.set_zlim(0, 1)
 
-            print(f"Components: {comp}")
+    #         print(f"Components: {comp}")
 
-            # print("Errors")
-            # print(f"True Mean: {subset['True_mean'].values[:]}")
-            # print(f"True Variance: {subset['True_var'].values[:]}")
-            # print(f"GM Man: {subset['Mean_Rel'].values[:]*subset['True_mean'].values[:]}")
-            # print(f"GM Var: {subset['Var_Rel'].values[:]*subset['True_var'].values[:]}")
-            # print(f"Mean Rel: {subset['Mean_Rel'].values[:]}")
-            # print(f"Var Rel: {subset['Var_Rel'].values[:]}")
-
-
-        ax.set_xlabel('Depth')
-        ax.set_ylabel('Width')
-        ax.set_zlabel('Rel. Mean Error')
-        ax.set_title(f'Mean Error Surface Plot\n(Variance={specific_variance})')
-        ax.legend([f'Components={comp}' for comp in components], loc='upper left', title='Components')
-
-        # Set the initial view angle
-        ax.view_init(elev=view_angle[0], azim=view_angle[1])
-
-    plt.tight_layout()
-    plt.savefig("workbench/mean_architecture_study_0.png", dpi=300)
-
-    #****** Do the Var surface Plots
-    fig, axes = plt.subplots(2, 2, figsize=(16, 16), subplot_kw={'projection': '3d'})
-    axes = axes.flatten()  # Flatten the 2D array of axes for easier iteration
-
-    # Variances to plot
-    variances_to_plot = [0.1, 0.5, 1.0, 1.5]
-    components = [1, 3, 5, 9, 15]
-    colors = ['red', 'blue', 'green', 'yellow','purple']  # Constant colors for each component
-
-    # Define initial view angles for each subplot
-    angle_a = 220
-    angle_b = 5
-    view_angles = [(angle_b, angle_a), (angle_b, angle_a), (angle_b, angle_a), (angle_b, angle_a)]
-    z_max = 10
-
-    for ax, specific_variance, view_angle in zip(axes, variances_to_plot, view_angles):
-        for comp, color in zip(components, colors):
-            subset = df[(np.isclose(df['Variance'], specific_variance, atol=1e-6)) & (df['Components'] == comp)]
-
-            # Pivot the data for 3D plotting
-            pivot_table = subset.pivot(index='Width', columns='Depth', values='Var_Rel')
-
-            # Create meshgrid for plotting
-            X, Y = np.meshgrid(pivot_table.columns, pivot_table.index)
-            Z = pivot_table.values
-
-            # Plot the 3D surface
-            ax.plot_surface(X, Y, Z, color=color, edgecolor='k', alpha=0.5, label=f'Components={comp}')
-            ax.set_zlim(0, 1)
-
-            print("Errors")
-            print(f"True Mean: {subset['True_mean'].values[:]}")
-            print(f"True Variance: {subset['True_var'].values[:]}")
-            print(f"GM Man: {subset['Mean_Rel'].values[:]*subset['True_mean'].values[:]}")
-            print(f"GM Var: {subset['Var_Rel'].values[:]*subset['True_var'].values[:]}")
-            print(f"Mean Rel: {subset['Mean_Rel'].values[:]}")
-            print(f"Var Rel: {subset['Var_Rel'].values[:]}")
+    #         # print("Errors")
+    #         # print(f"True Mean: {subset['True_mean'].values[:]}")
+    #         # print(f"True Variance: {subset['True_var'].values[:]}")
+    #         # print(f"GM Man: {subset['Mean_Rel'].values[:]*subset['True_mean'].values[:]}")
+    #         # print(f"GM Var: {subset['Var_Rel'].values[:]*subset['True_var'].values[:]}")
+    #         # print(f"Mean Rel: {subset['Mean_Rel'].values[:]}")
+    #         # print(f"Var Rel: {subset['Var_Rel'].values[:]}")
 
 
-        ax.set_xlabel('Depth')
-        ax.set_ylabel('Width')
-        ax.set_zlabel('Rel. Var Error')
-        ax.set_title(f'Var Error Surface Plot\n(Variance={specific_variance})')
-        ax.legend([f'Components={comp}' for comp in components], loc='upper left', title='Components')
+    #     ax.set_xlabel('Depth')
+    #     ax.set_ylabel('Width')
+    #     ax.set_zlabel('Rel. Mean Error')
+    #     ax.set_title(f'Mean Error Surface Plot\n(Variance={specific_variance})')
+    #     ax.legend([f'Components={comp}' for comp in components], loc='upper left', title='Components')
 
-        # Set the initial view angle
-        ax.view_init(elev=view_angle[0], azim=view_angle[1])
+    #     # Set the initial view angle
+    #     ax.view_init(elev=view_angle[0], azim=view_angle[1])
 
-    plt.tight_layout()
-    plt.savefig("workbench/var_architecture_study_0.png", dpi=300)
+    # plt.tight_layout()
+    # plt.savefig("workbench/mean_architecture_study_0.png", dpi=300)
 
-    plt.show()
+    # #****** Do the Var surface Plots
+    # fig, axes = plt.subplots(2, 2, figsize=(16, 16), subplot_kw={'projection': '3d'})
+    # axes = axes.flatten()  # Flatten the 2D array of axes for easier iteration
+
+    # # Variances to plot
+    # variances_to_plot = [0.1, 0.5, 1.0, 1.5]
+    # components = [1, 3, 5, 9, 15]
+    # colors = ['red', 'blue', 'green', 'yellow','purple']  # Constant colors for each component
+
+    # # Define initial view angles for each subplot
+    # angle_a = 220
+    # angle_b = 5
+    # view_angles = [(angle_b, angle_a), (angle_b, angle_a), (angle_b, angle_a), (angle_b, angle_a)]
+    # z_max = 10
+
+    # for ax, specific_variance, view_angle in zip(axes, variances_to_plot, view_angles):
+    #     for comp, color in zip(components, colors):
+    #         subset = df[(np.isclose(df['Variance'], specific_variance, atol=1e-6)) & (df['Components'] == comp)]
+
+    #         # Pivot the data for 3D plotting
+    #         pivot_table = subset.pivot(index='Width', columns='Depth', values='Var_Rel')
+
+    #         # Create meshgrid for plotting
+    #         X, Y = np.meshgrid(pivot_table.columns, pivot_table.index)
+    #         Z = pivot_table.values
+
+    #         # Plot the 3D surface
+    #         ax.plot_surface(X, Y, Z, color=color, edgecolor='k', alpha=0.5, label=f'Components={comp}')
+    #         ax.set_zlim(0, 1)
+
+    #         print("Errors")
+    #         print(f"True Mean: {subset['True_mean'].values[:]}")
+    #         print(f"True Variance: {subset['True_var'].values[:]}")
+    #         print(f"GM Man: {subset['Mean_Rel'].values[:]*subset['True_mean'].values[:]}")
+    #         print(f"GM Var: {subset['Var_Rel'].values[:]*subset['True_var'].values[:]}")
+    #         print(f"Mean Rel: {subset['Mean_Rel'].values[:]}")
+    #         print(f"Var Rel: {subset['Var_Rel'].values[:]}")
+
+
+    #     ax.set_xlabel('Depth')
+    #     ax.set_ylabel('Width')
+    #     ax.set_zlabel('Rel. Var Error')
+    #     ax.set_title(f'Var Error Surface Plot\n(Variance={specific_variance})')
+    #     ax.legend([f'Components={comp}' for comp in components], loc='upper left', title='Components')
+
+    #     # Set the initial view angle
+    #     ax.view_init(elev=view_angle[0], azim=view_angle[1])
+
+    # plt.tight_layout()
+    # plt.savefig("workbench/var_architecture_study_0.png", dpi=300)
+
+    # plt.show()
     
-    # Filter data for specific depths and widths
-    depths_to_plot = [1, 3, 5 , 10, 20, 30]
-    widths_to_plot = [1, 3, 5 , 10, 20, 30]
+    # # Filter data for specific depths and widths
+    # depths_to_plot = [1, 3, 5 , 10, 20, 30]
+    # widths_to_plot = [1, 3, 5 , 10, 20, 30]
 
-    #******Create Plot for widths******
-    specified_variance = 1.0  # Specify the variance you want to plot
+    # #******Create Plot for widths******
+    # specified_variance = 1.0  # Specify the variance you want to plot
 
-    for specified_depth in depths_to_plot:
-        plt.figure(figsize=(10, 8))
+    # for specified_depth in depths_to_plot:
+    #     plt.figure(figsize=(10, 8))
 
-        for width in widths_to_plot:
-            subset = df[(np.isclose(df['Depth'], specified_depth, atol=1e-6)) & 
-                    (np.isclose(df['Width'], width, atol=1e-6)) & 
-                    (np.isclose(df['Variance'], specified_variance, atol=1e-6))]
-            subset = subset.sort_values(by='Components', ascending=True)
-            plt.plot(subset['Components'], subset['Mean_Rel'], label=f'Depth={specified_depth}, Width={width}, Variance={specified_variance}', marker='o')
+    #     for width in widths_to_plot:
+    #         subset = df[(np.isclose(df['Depth'], specified_depth, atol=1e-6)) & 
+    #                 (np.isclose(df['Width'], width, atol=1e-6)) & 
+    #                 (np.isclose(df['Variance'], specified_variance, atol=1e-6))]
+    #         subset = subset.sort_values(by='Components', ascending=True)
+    #         plt.plot(subset['Components'], subset['Mean_Rel'], label=f'Depth={specified_depth}, Width={width}, Variance={specified_variance}', marker='o')
 
-        plt.xlabel('Components')
-        plt.ylabel('Relative Mean Error')
-        plt.ylim(0,1)
-        plt.title('Mean Error vs Components for Depth and Width (1 to 5)')
-        plt.legend()
-        plt.grid(True)
-        plt.savefig(f"workbench/mean_architecture_widths_d{specified_depth}_v{specified_variance}.png", dpi=300)
+    #     plt.xlabel('Components')
+    #     plt.ylabel('Relative Mean Error')
+    #     plt.ylim(0,1)
+    #     plt.title('Mean Error vs Components for Depth and Width (1 to 5)')
+    #     plt.legend()
+    #     plt.grid(True)
+    #     plt.savefig(f"workbench/mean_architecture_widths_d{specified_depth}_v{specified_variance}.png", dpi=300)
 
-        # Filter data for specific depths and widths
-    depths_to_plot = [1, 3, 5 , 10, 20, 30]
-    widths_to_plot = [1, 3, 5 , 10, 20, 30]
+    #     # Filter data for specific depths and widths
+    # depths_to_plot = [1, 3, 5 , 10, 20, 30]
+    # widths_to_plot = [1, 3, 5 , 10, 20, 30]
 
-    #Create plots for depths
-    specified_variance = 1.0  # Specify the variance you want to plot
+    # #Create plots for depths
+    # specified_variance = 1.0  # Specify the variance you want to plot
 
-    for specified_width in widths_to_plot:
-        plt.figure(figsize=(10, 8))
-        for depth in depths_to_plot:
-            subset = df[(np.isclose(df['Width'], specified_width, atol=1e-6)) & 
-                    (np.isclose(df['Depth'], depth, atol=1e-6)) & 
-                    (np.isclose(df['Variance'], specified_variance, atol=1e-6))]
-            subset = subset.sort_values(by='Components', ascending=True)
-            plt.plot(subset['Components'], subset['Mean_Rel'], label=f'Width={specified_width}, Depth={depth}, Variance={specified_variance}', marker='o')
+    # for specified_width in widths_to_plot:
+    #     plt.figure(figsize=(10, 8))
+    #     for depth in depths_to_plot:
+    #         subset = df[(np.isclose(df['Width'], specified_width, atol=1e-6)) & 
+    #                 (np.isclose(df['Depth'], depth, atol=1e-6)) & 
+    #                 (np.isclose(df['Variance'], specified_variance, atol=1e-6))]
+    #         subset = subset.sort_values(by='Components', ascending=True)
+    #         plt.plot(subset['Components'], subset['Mean_Rel'], label=f'Width={specified_width}, Depth={depth}, Variance={specified_variance}', marker='o')
 
-        plt.xlabel('Components')
-        plt.ylabel('Relative Mean Error')
-        plt.ylim(0,1)
-        plt.title('Mean Error vs Components for Width and Depth (1 to 5)')
-        plt.legend()
-        plt.grid(True)
-        plt.savefig(f"workbench/mean_architecture_depths_w{specified_width}_v{specified_variance}.png", dpi=300)
+    #     plt.xlabel('Components')
+    #     plt.ylabel('Relative Mean Error')
+    #     plt.ylim(0,1)
+    #     plt.title('Mean Error vs Components for Width and Depth (1 to 5)')
+    #     plt.legend()
+    #     plt.grid(True)
+    #     plt.savefig(f"workbench/mean_architecture_depths_w{specified_width}_v{specified_variance}.png", dpi=300)
 
-    print(f"Shape of training points: {len(training_pts_in)}")
+    # print(f"Shape of training points: {len(training_pts_in)}")
+
+
+    subset = df[(np.isclose(df['Variance'], 1.0, atol=1e-6))]
+    # Compute Width/Depth Parameter and add it to every line
+    subset.loc[:, 'WD_Ratio'] = subset['Width'] / subset['Depth']  # Safely add the new column
+
+    # Ensure all Mean_Rel values are positive
+    subset['Mean_Rel'] = subset['Mean_Rel'].abs()
+
+    subset = subset.sort_values(by='WD_Ratio', ascending=True)
+    subset = subset.reset_index(drop=True)  # Reset the index after sorting
+
+    plt.figure(figsize=(10, 6))
+    gm_1= subset[subset['Components'] == 1]
+    plt.scatter(gm_1['WD_Ratio'], gm_1['Mean_Rel'], label='1 component', color='red', marker='o')
+    gm_2 = subset[subset['Components'] == 2]
+    plt.scatter(gm_2['WD_Ratio'], gm_2['Mean_Rel'], label='2 components', color='blue', marker='o')
+    gm_5 = subset[subset['Components'] == 5]
+    plt.scatter(gm_5['WD_Ratio'], gm_5['Mean_Rel'], label='5 components', color='green', marker='o')
+    gm_10 = subset[subset['Components'] == 10]
+    plt.scatter(gm_10['WD_Ratio'], gm_10['Mean_Rel'], label='10 components', color='yellow', marker='o')
+    gm_15 = subset[subset['Components'] == 15]
+    plt.scatter(gm_15['WD_Ratio'], gm_15['Mean_Rel'], label='15 components', color='purple', marker='o')
+    plt.axhline(y=0.1, color='black', linestyle='--', linewidth=1, label='10%')
+    plt.xlabel('Width/Depth Ratio')
+    plt.ylabel('Relative Mean Error')
+    plt.title("Mean Error vs Width/Depth Ratio")
+    plt.ylim(0,2)
+    plt.tight_layout()
+    plt.legend()
+    plt.grid(True)
+    plt.savefig("workbench/ratio_vs_mean_error.png", dpi=300)
+
 
 if single_run:
     # Set Parametrrs

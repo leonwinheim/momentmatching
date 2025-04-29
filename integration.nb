@@ -1,0 +1,223 @@
+(* Content-type: application/vnd.wolfram.mathematica *)
+
+(*** Wolfram Notebook File ***)
+(* http://www.wolfram.com/nb *)
+
+(* CreatedBy='Wolfram 14.2' *)
+
+(*CacheID: 234*)
+(* Internal cache information:
+NotebookFileLineBreakTest
+NotebookFileLineBreakTest
+NotebookDataPosition[       154,          7]
+NotebookDataLength[      7534,        215]
+NotebookOptionsPosition[      6639,        192]
+NotebookOutlinePosition[      7044,        208]
+CellTagsIndexPosition[      7001,        205]
+WindowFrame->Normal*)
+
+(* Beginning of Notebook Content *)
+Notebook[{
+
+Cell[CellGroupData[{
+Cell["Computation of stochastic moments for activation functions", "Title",
+ CellChangeTimes->{{3.9548999825854874`*^9, 
+  3.954900028232519*^9}},ExpressionUUID->"296ee294-6cfc-c946-9347-\
+77c660538638"],
+
+Cell["Define general ReLU/Leaky ReLU function", "Subtitle",
+ CellChangeTimes->{{3.954900041796564*^9, 
+  3.9549000529969654`*^9}},ExpressionUUID->"b45a9632-8db5-9e4a-9f74-\
+f9c8a66919a7"],
+
+Cell[BoxData[
+ RowBox[{
+  RowBox[{
+   RowBox[{"leakyReLU", "[", 
+    RowBox[{"x_", ",", "\[Alpha]_"}], "]"}], ":=", 
+   RowBox[{"Piecewise", "[", 
+    RowBox[{
+     RowBox[{"{", 
+      RowBox[{"{", 
+       RowBox[{
+        RowBox[{"\[Alpha]", " ", "x"}], ",", 
+        RowBox[{"x", "<", "0"}]}], "}"}], "}"}], ",", "x"}], "]"}]}], 
+  ";"}]], "Text",
+ CellChangeTimes->{{3.954897106493803*^9, 3.9548971105265217`*^9}, {
+  3.954897182279888*^9, 3.95489718325984*^9}, {3.9548973713727818`*^9, 
+  3.9548973732828293`*^9}, {3.954897941685917*^9, 3.954897942405876*^9}, {
+  3.954899862313734*^9, 3.9548998669242706`*^9}, {3.9548999315196743`*^9, 
+  3.954899970612911*^9}},ExpressionUUID->"3ea25fed-1163-6a40-8391-\
+124cb764f859"],
+
+Cell[CellGroupData[{
+
+Cell["\<\
+Compute some moments for a Gaussian Distribution propagated through the \
+general ReLU\
+\>", "Subtitle",
+ CellChangeTimes->{{3.954900075460766*^9, 
+  3.9549001196197605`*^9}},ExpressionUUID->"5fb8cdbd-20ae-9243-bb07-\
+2b6e50bc2f8c"],
+
+Cell[BoxData[{
+ RowBox[{
+  RowBox[{"m1", " ", "=", " ", 
+   RowBox[{"FullSimplify", "[", 
+    RowBox[{"Integrate", "[", 
+     RowBox[{
+      RowBox[{
+       RowBox[{"leakyReLU", "[", 
+        RowBox[{"x", ",", "\[Alpha]"}], "]"}], "*", 
+       RowBox[{"PDF", "[", 
+        RowBox[{
+         RowBox[{"NormalDistribution", "[", 
+          RowBox[{"\[Mu]", ",", "\[Sigma]"}], "]"}], ",", "x"}], "]"}]}], ",", 
+      RowBox[{"{", 
+       RowBox[{"x", ",", 
+        RowBox[{"-", "\[Infinity]"}], ",", "\[Infinity]"}], "}"}], ",", 
+      RowBox[{"Assumptions", "->", 
+       RowBox[{"{", 
+        RowBox[{"\[Sigma]", ">", "0"}], "}"}]}]}], "]"}], "]"}]}], ";"}], "\[IndentingNewLine]", 
+ RowBox[{
+  RowBox[{"m2", " ", "=", " ", 
+   RowBox[{"FullSimplify", "[", 
+    RowBox[{"Integrate", "[", 
+     RowBox[{
+      RowBox[{
+       RowBox[{
+        RowBox[{"leakyReLU", "[", 
+         RowBox[{"x", ",", "\[Alpha]"}], "]"}], "^", "2"}], "*", 
+       RowBox[{"PDF", "[", 
+        RowBox[{
+         RowBox[{"NormalDistribution", "[", 
+          RowBox[{"\[Mu]", ",", "\[Sigma]"}], "]"}], ",", "x"}], "]"}]}], ",", 
+      RowBox[{"{", 
+       RowBox[{"x", ",", 
+        RowBox[{"-", "\[Infinity]"}], ",", "\[Infinity]"}], "}"}], ",", 
+      RowBox[{"Assumptions", "->", 
+       RowBox[{"{", 
+        RowBox[{"\[Sigma]", ">", "0"}], "}"}]}]}], "]"}], "]"}]}], ";"}], "\[IndentingNewLine]", 
+ RowBox[{
+  RowBox[{"m3", " ", "=", " ", 
+   RowBox[{"FullSimplify", "[", 
+    RowBox[{"Integrate", "[", 
+     RowBox[{
+      RowBox[{
+       RowBox[{
+        RowBox[{"leakyReLU", "[", 
+         RowBox[{"x", ",", "\[Alpha]"}], "]"}], "^", "3"}], "*", 
+       RowBox[{"PDF", "[", 
+        RowBox[{
+         RowBox[{"NormalDistribution", "[", 
+          RowBox[{"\[Mu]", ",", "\[Sigma]"}], "]"}], ",", "x"}], "]"}]}], ",", 
+      RowBox[{"{", 
+       RowBox[{"x", ",", 
+        RowBox[{"-", "\[Infinity]"}], ",", "\[Infinity]"}], "}"}], ",", 
+      RowBox[{"Assumptions", "->", 
+       RowBox[{"{", 
+        RowBox[{"\[Sigma]", ">", "0"}], "}"}]}]}], "]"}], "]"}]}], ";"}], "\[IndentingNewLine]", 
+ RowBox[{
+  RowBox[{"m4", " ", "=", " ", 
+   RowBox[{"FullSimplify", "[", 
+    RowBox[{"Integrate", "[", 
+     RowBox[{
+      RowBox[{
+       RowBox[{
+        RowBox[{"leakyReLU", "[", 
+         RowBox[{"x", ",", "\[Alpha]"}], "]"}], "^", "4"}], "*", 
+       RowBox[{"PDF", "[", 
+        RowBox[{
+         RowBox[{"NormalDistribution", "[", 
+          RowBox[{"\[Mu]", ",", "\[Sigma]"}], "]"}], ",", "x"}], "]"}]}], ",", 
+      RowBox[{"{", 
+       RowBox[{"x", ",", 
+        RowBox[{"-", "\[Infinity]"}], ",", "\[Infinity]"}], "}"}], ",", 
+      RowBox[{"Assumptions", "->", 
+       RowBox[{"{", 
+        RowBox[{"\[Sigma]", ">", "0"}], "}"}]}]}], "]"}], "]"}]}], ";"}], "\[IndentingNewLine]", 
+ RowBox[{
+  RowBox[{"m5", " ", "=", " ", 
+   RowBox[{"FullSimplify", "[", 
+    RowBox[{"Integrate", "[", 
+     RowBox[{
+      RowBox[{
+       RowBox[{
+        RowBox[{"leakyReLU", "[", 
+         RowBox[{"x", ",", "\[Alpha]"}], "]"}], "^", "5"}], "*", 
+       RowBox[{"PDF", "[", 
+        RowBox[{
+         RowBox[{"NormalDistribution", "[", 
+          RowBox[{"\[Mu]", ",", "\[Sigma]"}], "]"}], ",", "x"}], "]"}]}], ",", 
+      RowBox[{"{", 
+       RowBox[{"x", ",", 
+        RowBox[{"-", "\[Infinity]"}], ",", "\[Infinity]"}], "}"}], ",", 
+      RowBox[{"Assumptions", "->", 
+       RowBox[{"{", 
+        RowBox[{"\[Sigma]", ">", "0"}], "}"}]}]}], "]"}], "]"}]}], 
+  ";"}]}], "Input",
+ CellChangeTimes->{{3.9548995902105503`*^9, 3.9548996116105576`*^9}},
+ CellLabel->"In[45]:=",ExpressionUUID->"944e169d-fd2d-9844-8bf5-1092a94a9234"],
+
+Cell[BoxData[
+ RowBox[{
+  RowBox[{
+   RowBox[{"mn", " ", "=", " ", 
+    RowBox[{"FullSimplify", "[", 
+     RowBox[{"Integrate", "[", 
+      RowBox[{
+       RowBox[{
+        RowBox[{
+         RowBox[{"leakyReLU", "[", 
+          RowBox[{"x", ",", "\[Alpha]"}], "]"}], "^", "n"}], "*", 
+        RowBox[{"PDF", "[", 
+         RowBox[{
+          RowBox[{"NormalDistribution", "[", 
+           RowBox[{"\[Mu]", ",", "\[Sigma]"}], "]"}], ",", "x"}], "]"}]}], ",", 
+       RowBox[{"{", 
+        RowBox[{"x", ",", 
+         RowBox[{"-", "\[Infinity]"}], ",", "\[Infinity]"}], "}"}], ",", 
+       RowBox[{"Assumptions", "->", 
+        RowBox[{"{", 
+         RowBox[{
+          RowBox[{"\[Sigma]", ">", "0"}], ",", 
+          RowBox[{
+           RowBox[{"n", "\[Element]", "Integers"}], "&&", 
+           RowBox[{"n", ">", "0"}]}]}], "}"}]}]}], "]"}], "]"}]}], ";"}], 
+  "\[IndentingNewLine]"}]], "Input",
+ CellChangeTimes->{3.9548996279617767`*^9, 3.954899667491165*^9},
+ CellLabel->"In[50]:=",ExpressionUUID->"3c52656f-21af-db48-aa32-3a8b4bfb4604"]
+}, Open  ]]
+}, Open  ]]
+},
+WindowSize->{1440, 831.75},
+WindowMargins->{{1274, Automatic}, {Automatic, -6}},
+FrontEndVersion->"14.2 for Microsoft Windows (64-bit) (March 14, 2025)",
+StyleDefinitions->"Default.nb",
+ExpressionUUID->"7a8e07c0-e4f3-7b4c-87da-51ebe488103d"
+]
+(* End of Notebook Content *)
+
+(* Internal cache information *)
+(*CellTagsOutline
+CellTagsIndex->{}
+*)
+(*CellTagsIndex
+CellTagsIndex->{}
+*)
+(*NotebookFileOutline
+Notebook[{
+Cell[CellGroupData[{
+Cell[576, 22, 203, 3, 96, "Title",ExpressionUUID->"296ee294-6cfc-c946-9347-77c660538638"],
+Cell[782, 27, 187, 3, 52, "Subtitle",ExpressionUUID->"b45a9632-8db5-9e4a-9f74-f9c8a66919a7"],
+Cell[972, 32, 723, 18, 32, "Text",ExpressionUUID->"3ea25fed-1163-6a40-8391-124cb764f859"],
+Cell[CellGroupData[{
+Cell[1720, 54, 242, 6, 52, "Subtitle",ExpressionUUID->"5fb8cdbd-20ae-9243-bb07-2b6e50bc2f8c"],
+Cell[1965, 62, 3603, 97, 183, "Input",ExpressionUUID->"944e169d-fd2d-9844-8bf5-1092a94a9234"],
+Cell[5571, 161, 1040, 27, 63, "Input",ExpressionUUID->"3c52656f-21af-db48-aa32-3a8b4bfb4604"]
+}, Open  ]]
+}, Open  ]]
+}
+]
+*)
+
