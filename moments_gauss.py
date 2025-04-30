@@ -50,7 +50,7 @@ plt.grid()
 #******Do the analytical moment computation******
 # Define the symbolic variables (exclude erf and erfc here)
 # a is the slope of the leaky part or the ReLU, c is the variance of the Gaussian, mu is the mean of the Gaussian
-a, c, mu = var('a c mu')
+a, c, mu, = var('a c mu')
 
 # Gaussian Moment through leaky relu.Expression from mathematica (\[]-Style expressions need to be replaced without brackets)
 m = []
