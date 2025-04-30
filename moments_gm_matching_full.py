@@ -2,7 +2,7 @@
 # This script tests the analytical moment computation of a GM distribution
 # propagated through a leaky ReLU function. Moment Expressions are obtained from
 # Mathematica and parsed using sympy.
-# Here, we perform the actual Moment matching for two component location mixture
+# Here, we perform the actual Moment matching for two component full mixture
 # Author: Leon Winheim
 # Date: 29.04.2025
 #################################################################################
@@ -15,6 +15,8 @@ import time
 import sklearn
 import re
 from scipy.optimize import least_squares
+
+raise(DeprecationWarning("Ich brauch andere momente für nicht location mixtures"))
 
 #******Define testing connditions******
 np.random.seed(42)  # Set seed for reproducibility
@@ -83,6 +85,7 @@ m7 = r"1/2 Erf[mu[0]/(Sqrt[2] c)] mu[0] (105 c^6 + 105 c^4 mu[0]^2 + 21 c^2 mu[0
 m8 = r"105 c^8 w[0] + 1/(2 Sqrt[\\[Pi]]) E^(-((mu[0]^2 + mu[1]^2)/(2 c^2))) (-Sqrt[2] (-1 + a^8) c E^(mu[0]^2/(2 c^2)) mu[1] (279 c^6 + 185 c^4 mu[1]^2 + 27 c^2 mu[1]^4 + mu[1]^6) w[1] + E^(mu[1]^2/(2 c^2)) (-Sqrt[2] (-1 + a^8) c mu[0] (279 c^6 + 185 c^4 mu[0]^2 + 27 c^2 mu[0]^4 + mu[0]^6) w[0] + E^(mu[0]^2/(2 c^2)) Sqrt[\\[Pi]] (2 mu[0]^2 (420 c^6 + 210 c^4 mu[0]^2 + 28 c^2 mu[0]^4 + mu[0]^6) w[0] + (-1 + a^8) Erfc[mu[0]/(Sqrt[2] c)] (105 c^8 + 420 c^6 mu[0]^2 + 210 c^4 mu[0]^4 + 28 c^2 mu[0]^6 + mu[0]^8) w[0] + (2 + (-1 + a^8) Erfc[mu[1]/(Sqrt[2] c)]) (105 c^8 + 420 c^6 mu[1]^2 + 210 c^4 mu[1]^4 + 28 c^2 mu[1]^6 + mu[1]^8) w[1])))"
 m9 = r"1/2 Erf[mu[0]/(Sqrt[2] c)] mu[0] (945 c^8 + 1260 c^6 mu[0]^2 + 378 c^4 mu[0]^4 + 36 c^2 mu[0]^6 + mu[0]^8) w[0] + 1/(2 Sqrt[\\[Pi]]) E^(-((mu[0]^2 + mu[1]^2)/(2 c^2))) (-Sqrt[2] (-1 + a^9) c E^(mu[1]^2/(2 c^2)) (384 c^8 + 975 c^6 mu[0]^2 + 345 c^4 mu[0]^4 + 35 c^2 mu[0]^6 + mu[0]^8) w[0] + E^(mu[0]^2/(2 c^2)) (-Sqrt[2] (-1 + a^9) c (384 c^8 + 975 c^6 mu[1]^2 + 345 c^4 mu[1]^4 + 35 c^2 mu[1]^6 + mu[1]^8) w[1] + E^(mu[1]^2/(2 c^2)) Sqrt[\\[Pi]] ((1 + a^9 Erfc[mu[0]/(Sqrt[2] c)]) mu[0] (945 c^8 + 1260 c^6 mu[0]^2 + 378 c^4 mu[0]^4 + 36 c^2 mu[0]^6 + mu[0]^8) w[0] + (2 + (-1 + a^9) Erfc[mu[1]/(Sqrt[2] c)]) mu[1] (945 c^8 + 1260 c^6 mu[1]^2 + 378 c^4 mu[1]^4 + 36 c^2 mu[1]^6 + mu[1]^8) w[1])))"
 m10 = r"945 c^10 w[0] + 1/(2 Sqrt[\\[Pi]]) E^(-((mu[0]^2 + mu[1]^2)/(2 c^2))) (-Sqrt[2] (-1 + a^10) c E^(mu[0]^2/(2 c^2)) mu[1] (2895 c^8 + 2640 c^6 mu[1]^2 + 588 c^4 mu[1]^4 + 44 c^2 mu[1]^6 + mu[1]^8) w[1] + E^(mu[1]^2/(2 c^2)) (-Sqrt[2] (-1 + a^10) c mu[0] (2895 c^8 + 2640 c^6 mu[0]^2 + 588 c^4 mu[0]^4 + 44 c^2 mu[0]^6 + mu[0]^8) w[0] + E^(mu[0]^2/(2 c^2)) Sqrt[\\[Pi]] (2 mu[0]^2 (4725 c^8 + 3150 c^6 mu[0]^2 + 630 c^4 mu[0]^4 + 45 c^2 mu[0]^6 + mu[0]^8) w[0] + (-1 + a^10) Erfc[mu[0]/(Sqrt[2] c)] (945 c^10 + 4725 c^8 mu[0]^2 + 3150 c^6 mu[0]^4 + 630 c^4 mu[0]^6 + 45 c^2 mu[0]^8 + mu[0]^10) w[0] + (2 + (-1 + a^10) Erfc[mu[1]/(Sqrt[2] c)]) (945 c^10 + 4725 c^8 mu[1]^2 + 3150 c^6 mu[1]^4 + 630 c^4 mu[1]^6 + 45 c^2 mu[1]^8 + mu[1]^10) w[1])))"
+
 
 # Replace \[Pi] with Pi in the expressions so python can read it
 def replace_pi(expression):
