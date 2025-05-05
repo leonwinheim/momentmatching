@@ -63,6 +63,26 @@ def e9(mu, c_v):
     return 945*(c_v**4)*mu+1260*(c_v**3)*(mu**3)+378*(c_v**2)*(mu**5)+36*c_v*(mu**7)+mu**9
 def e10(mu, c_v):
     return 945*c_v**5+4725*(c_v**4)*(mu**2)+3150*(c_v**3)*(mu**4)+630*(c_v**2)*(mu**6)+45*(c_v)*mu**8+mu**10
+def e11(mu, c_v):
+    return 10395*c_v**5*mu + 17325*c_v**4*mu**3 + 6930*c_v**3*mu**5 + 990*c_v**2*mu**7 + 55*c_v*mu**9 + mu**11
+def e12(mu, c_v):
+    return 10395*c_v**6 + 62370*c_v**5*mu**2 + 51975*c_v**4*mu**4 + 13860*c_v**3*mu**6 + 1485*c_v**2*mu**8 + 66*c_v*mu**10 + mu**12
+def e13(mu, c_v):
+    return 135135*c_v**6*mu + 270270*c_v**5*mu**3 + 135135*c_v**4*mu**5 + 25740*c_v**3*mu**7 + 2145*c_v**2*mu**9 + 78*c_v*mu**11 + mu**13
+def e14(mu, c_v):
+    return 135135*c_v**7 + 945945*c_v**6*mu**2 + 945945*c_v**5*mu**4 + 315315*c_v**4*mu**6 + 45045*c_v**3*mu**8 + 3003*c_v**2*mu**10 + 91*c_v*mu**12 + mu**14
+def e15(mu, c_v):
+    return 2027025*c_v**7*mu + 4729725*c_v**6*mu**3 + 2837835*c_v**5*mu**5 + 675675*c_v**4*mu**7 + 75075*c_v**3*mu**9 + 4095*c_v**2*mu**11 + 105*c_v*mu**13 + mu**15
+def e16(mu, c_v):
+    return 2027025*c_v**8 + 16216200*c_v**7*mu**2 + 18918900*c_v**6*mu**4 + 7567560*c_v**5*mu**6 + 1351350*c_v**4*mu**8 + 120120*c_v**3*mu**10 + 5460*c_v**2*mu**12 + 120*c_v*mu**14 + mu**16
+def e17(mu, c_v):
+    return 34459425*c_v**8*mu + 91891800*c_v**7*mu**3 + 64324260*c_v**6*mu**5 + 18378360*c_v**5*mu**7 + 2552550*c_v**4*mu**9 + 185640*c_v**3*mu**11 + 7140*c_v**2*mu**13 + 136*c_v*mu**15 + mu**17
+def e18(mu, c_v):
+    return 34459425*c_v**9 + 310134825*c_v**8*mu**2 + 413513100*c_v**7*mu**4 + 192972780*c_v**6*mu**6 + 41351310*c_v**5*mu**8 + 4594590*c_v**4*mu**10 + 278460*c_v**3*mu**12 + 9180*c_v**2*mu**14 + 153*c_v*mu**16 + mu**18
+def e19(mu, c_v):
+    return 654729075*c_v**9*mu + 1964187225*c_v**8*mu**3 + 1571349780*c_v**7*mu**5 + 523783260*c_v**6*mu**7 + 87297210*c_v**5*mu**9 + 7936110*c_v**4*mu**11 + 406980*c_v**3*mu**13 + 11628*c_v**2*mu**15 + 171*c_v*mu**17 + mu**19
+def e20(mu, c_v):
+    return 654729075*c_v**10 + 6547290750*c_v**9*mu**2 + 9820936125*c_v**8*mu**4 + 5237832600*c_v**7*mu**6 + 1309458150*c_v**6*mu**8 + 174594420*c_v**5*mu**10 + 13226850*c_v**4*mu**12 + 581400*c_v**3*mu**14 + 14535*c_v**2*mu**16 + 190*c_v*mu**18 + mu**20
 
 # Noncentral moments of a Gaussian Mixture
 def e1_gm(w0_v,w1_v,mu0_v,mu1_v,c0_v,c1_v):
@@ -95,6 +115,36 @@ def e9_gm(w0_v,w1_v,mu0_v,mu1_v,c0_v,c1_v):
 def e10_gm(w0_v,w1_v,mu0_v,mu1_v,c0_v,c1_v):
     return (w0_v*e10(mu0_v,c0_v) + w1_v*e10(mu1_v,c1_v))
 
+def e11_gm(w0_v,w1_v,mu0_v,mu1_v,c0_v,c1_v):
+    return (w0_v*e11(mu0_v,c0_v) + w1_v*e11(mu1_v,c1_v))
+
+def e12_gm(w0_v, w1_v, mu0_v, mu1_v, c0_v, c1_v):
+    return (w0_v * e12(mu0_v, c0_v) + w1_v * e12(mu1_v, c1_v))
+
+def e13_gm(w0_v, w1_v, mu0_v, mu1_v, c0_v, c1_v):
+    return (w0_v * e13(mu0_v, c0_v) + w1_v * e13(mu1_v, c1_v))
+
+def e14_gm(w0_v, w1_v, mu0_v, mu1_v, c0_v, c1_v):
+    return (w0_v * e14(mu0_v, c0_v) + w1_v * e14(mu1_v, c1_v))
+
+def e15_gm(w0_v, w1_v, mu0_v, mu1_v, c0_v, c1_v):
+    return (w0_v * e15(mu0_v, c0_v) + w1_v * e15(mu1_v, c1_v))
+
+def e16_gm(w0_v, w1_v, mu0_v, mu1_v, c0_v, c1_v):
+    return (w0_v * e16(mu0_v, c0_v) + w1_v * e16(mu1_v, c1_v))
+
+def e17_gm(w0_v, w1_v, mu0_v, mu1_v, c0_v, c1_v):
+    return (w0_v * e17(mu0_v, c0_v) + w1_v * e17(mu1_v, c1_v))
+
+def e18_gm(w0_v, w1_v, mu0_v, mu1_v, c0_v, c1_v):
+    return (w0_v * e18(mu0_v, c0_v) + w1_v * e18(mu1_v, c1_v))
+
+def e19_gm(w0_v, w1_v, mu0_v, mu1_v, c0_v, c1_v):
+    return (w0_v * e19(mu0_v, c0_v) + w1_v * e19(mu1_v, c1_v))
+
+def e20_gm(w0_v, w1_v, mu0_v, mu1_v, c0_v, c1_v):
+    return (w0_v * e20(mu0_v, c0_v) + w1_v * e20(mu1_v, c1_v))
+
 # Function to compute the residuals for optimization
 def residuals(params, t1, t2, t3, t4, t5, t6, t7, t8, t9, t10):
     w0_v, mu0_v, mu1_v, c0_v, c1_v = params
@@ -110,6 +160,25 @@ def residuals(params, t1, t2, t3, t4, t5, t6, t7, t8, t9, t10):
         e8_gm(w0_v,w1_v,mu0_v,mu1_v,c0_v,c1_v) - t8,
         e9_gm(w0_v,w1_v,mu0_v,mu1_v,c0_v,c1_v) - t9,
         e10_gm(w0_v,w1_v,mu0_v,mu1_v,c0_v,c1_v) - t10
+    ], dtype=float)
+
+    return r
+
+# Function to compute the residuals for optimization
+def residuals_weighted(params, t1, t2, t3, t4, t5, t6, t7, t8, t9, t10):
+    w0_v, mu0_v, mu1_v, c0_v, c1_v = params
+    w1_v = 1 - w0_v    #Attention! For more components we need to enforce the weights will be 1 in sum differently
+    r = np.array([
+        ((e1_gm(w0_v,w1_v,mu0_v,mu1_v,c0_v,c1_v) - t1) / t1),
+        ((e2_gm(w0_v,w1_v,mu0_v,mu1_v,c0_v,c1_v) - t2) / t2),
+        ((e3_gm(w0_v,w1_v,mu0_v,mu1_v,c0_v,c1_v) - t3) / t3),
+        ((e4_gm(w0_v,w1_v,mu0_v,mu1_v,c0_v,c1_v) - t4) / t4),
+        ((e5_gm(w0_v,w1_v,mu0_v,mu1_v,c0_v,c1_v) - t5) / t5),
+        ((e6_gm(w0_v,w1_v,mu0_v,mu1_v,c0_v,c1_v) - t6) / t6),
+        ((e7_gm(w0_v,w1_v,mu0_v,mu1_v,c0_v,c1_v) - t7) / t7),
+        ((e8_gm(w0_v,w1_v,mu0_v,mu1_v,c0_v,c1_v) - t8) / t8),
+        ((e9_gm(w0_v,w1_v,mu0_v,mu1_v,c0_v,c1_v) - t9) / t9),
+        ((e10_gm(w0_v,w1_v,mu0_v,mu1_v,c0_v,c1_v) - t10) / t10)
     ], dtype=float)
 
     return r
@@ -188,5 +257,5 @@ def fit_gm_moments(params,args):
     Fit the Gaussian Mixture model to the moments using least squares optimization.
     """
     # Call optimizer with bounds
-    result = least_squares(residuals,params,args=args)
+    result = least_squares(residuals_weighted,params,args=args)
     return result

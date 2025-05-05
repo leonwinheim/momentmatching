@@ -12,9 +12,12 @@ import seaborn as sns
 import time
 import sklearn
 import gm_funcs
+import os
 
 #******Define testing connditions******
 np.random.seed(42)  # Set seed for reproducibility
+os.environ["LOKY_MAX_CPU_COUNT"] = "12"  # Limit the number of threads used by joblib, windows 11 stuff
+
 
 # Define leaky ReLU function
 def leaky_relu(x, a):
@@ -25,12 +28,12 @@ def leaky_relu(x, a):
 #################################################################################
 #******Sample Based Moment Computation******
 # Parameters for the prior Gaussian Mixture with two components
-# a is the slope of the leaky part or the ReLU, c is the variance of the Gaussians, mu are the means of the GLM, w are the weights of the GLM
+# a is the slope of the leaky part or the ReLU, c is the variance of the Gaussians, mu are the means of the GM, w are the weights of the GLM
 a_test = 0.05
-c0_test = 0.8
+c0_test = 0.2
 c1_test = 1.2
 mu0_test = 0.0
-mu1_test = 3.0
+mu1_test = 5.0
 w0_test = 0.2
 w1_test = 0.8
 
@@ -169,6 +172,13 @@ w11 = 0.5
 c0 = 0.1
 c1 = 1.0
 
+# mu00 = 2.7
+# mu11 = 0.0
+# w00 = 0.9
+# w11 = 0.5
+# c0 = 1.6
+# c1 = 0.0007
+
 params0 = [w00, mu00, mu11, c0, c1]
 args=(t1, t2, t3, t4, t5, t6, t7, t8, t9, t10)
 
@@ -204,6 +214,12 @@ samples_post_fitted_EM = gm.sample(100000)[0]
 em_weights = gm.weights_
 em_means = gm.means_.flatten()
 em_covariances = gm.covariances_.flatten()
+print("Optimized parameters EM-based:")
+print("w0:", em_weights[0])
+print("mu0:", em_means[0])
+print("mu1:", em_means[1])
+print("c0:", em_covariances[0])
+print("c1:", em_covariances[1])
 
 #Print the analyic moments, fitted empirical moments of Moment-based and of EM
 print("*****Moment Comparison*****")
@@ -216,7 +232,25 @@ print(f"Order {6}, Analytic: {moments_analytic[5]:.4f}, Moment-Based: {gm_funcs.
 print(f"Order {7}, Analytic: {moments_analytic[6]:.4f}, Moment-Based: {gm_funcs.e7_gm(result.x[0],1-result.x[0],result.x[1],result.x[2],result.x[3],result.x[4]):.4f}, EM: {gm_funcs.e7_gm(em_weights[0], em_weights[1], em_means[0], em_means[1],em_covariances[0],em_covariances[1]):.4f}")
 print(f"Order {8}, Analytic: {moments_analytic[7]:.4f}, Moment-Based: {gm_funcs.e8_gm(result.x[0],1-result.x[0],result.x[1],result.x[2],result.x[3],result.x[4]):.4f}, EM: {gm_funcs.e8_gm(em_weights[0], em_weights[1], em_means[0], em_means[1],em_covariances[0],em_covariances[1]):.4f}")
 print(f"Order {9}, Analytic: {moments_analytic[8]:.4f}, Moment-Based: {gm_funcs.e9_gm(result.x[0],1-result.x[0],result.x[1],result.x[2],result.x[3],result.x[4]):.4f}, EM: {gm_funcs.e9_gm(em_weights[0], em_weights[1], em_means[0], em_means[1],em_covariances[0],em_covariances[1]):.4f}")
-print(f"Order {10}, Analytic: {moments_analytic[9]:.4f}, Moment-Based: {gm_funcs.e10_gm(result.x[0],1-result.x[0],result.x[1],result.x[2],result.x[3],result.x[4]):.4f}, EM: {gm_funcs.e10_gm(em_weights[0], em_weights[1], em_means[0], em_means[1],em_covariances[0],em_covariances[1]):.4f}")
+print(f"Order {10}, Analytic: {0:.4f}, Moment-Based: {gm_funcs.e10_gm(result.x[0],1-result.x[0],result.x[1],result.x[2],result.x[3],result.x[4]):.4f}, EM: {gm_funcs.e10_gm(em_weights[0], em_weights[1], em_means[0], em_means[1],em_covariances[0],em_covariances[1]):.4f}")
+print(f"Order {11}, Analytic: {0:.4f}, Moment-Based: {gm_funcs.e11_gm(result.x[0],1-result.x[0],result.x[1],result.x[2],result.x[3],result.x[4]):.4f}, EM: {gm_funcs.e11_gm(em_weights[0], em_weights[1], em_means[0], em_means[1],em_covariances[0],em_covariances[1]):.4f}")
+print(f"Order {12}, Analytic: {0:.4f}, Moment-Based: {gm_funcs.e12_gm(result.x[0],1-result.x[0],result.x[1],result.x[2],result.x[3],result.x[4]):.4f}, EM: {gm_funcs.e12_gm(em_weights[0], em_weights[1], em_means[0], em_means[1],em_covariances[0],em_covariances[1]):.4f}")
+print(f"Order {13}, Analytic: {0:.4f}, Moment-Based: {gm_funcs.e13_gm(result.x[0],1-result.x[0],result.x[1],result.x[2],result.x[3],result.x[4]):.4f}, EM: {gm_funcs.e13_gm(em_weights[0], em_weights[1], em_means[0], em_means[1],em_covariances[0],em_covariances[1]):.4f}")
+print(f"Order {14}, Analytic: {0:.4f}, Moment-Based: {gm_funcs.e14_gm(result.x[0],1-result.x[0],result.x[1],result.x[2],result.x[3],result.x[4]):.4f}, EM: {gm_funcs.e14_gm(em_weights[0], em_weights[1], em_means[0], em_means[1],em_covariances[0],em_covariances[1]):.4f}")
+print(f"Order {15}, Analytic: {0:.4f}, Moment-Based: {gm_funcs.e15_gm(result.x[0],1-result.x[0],result.x[1],result.x[2],result.x[3],result.x[4]):.4f}, EM: {gm_funcs.e15_gm(em_weights[0], em_weights[1], em_means[0], em_means[1],em_covariances[0],em_covariances[1]):.4f}")
+print(f"Order {16}, Analytic: {0:.4f}, Moment-Based: {gm_funcs.e16_gm(result.x[0],1-result.x[0],result.x[1],result.x[2],result.x[3],result.x[4]):.4f}, EM: {gm_funcs.e16_gm(em_weights[0], em_weights[1], em_means[0], em_means[1],em_covariances[0],em_covariances[1]):.4f}")
+print(f"Order {17}, Analytic: {0:.4f}, Moment-Based: {gm_funcs.e17_gm(result.x[0],1-result.x[0],result.x[1],result.x[2],result.x[3],result.x[4]):.4f}, EM: {gm_funcs.e17_gm(em_weights[0], em_weights[1], em_means[0], em_means[1],em_covariances[0],em_covariances[1]):.4f}")
+print(f"Order {18}, Analytic: {0:.4f}, Moment-Based: {gm_funcs.e18_gm(result.x[0],1-result.x[0],result.x[1],result.x[2],result.x[3],result.x[4]):.4f}, EM: {gm_funcs.e18_gm(em_weights[0], em_weights[1], em_means[0], em_means[1],em_covariances[0],em_covariances[1]):.4f}")
+print(f"Order {19}, Analytic: {0:.4f}, Moment-Based: {gm_funcs.e19_gm(result.x[0],1-result.x[0],result.x[1],result.x[2],result.x[3],result.x[4]):.4f}, EM: {gm_funcs.e19_gm(em_weights[0], em_weights[1], em_means[0], em_means[1],em_covariances[0],em_covariances[1]):.4f}")
+print(f"Order {20}, Analytic: {0:.4f}, Moment-Based: {gm_funcs.e20_gm(result.x[0],1-result.x[0],result.x[1],result.x[2],result.x[3],result.x[4]):.4f}, EM: {gm_funcs.e20_gm(em_weights[0], em_weights[1], em_means[0], em_means[1],em_covariances[0],em_covariances[1]):.4f}")
+
+#Compute empirical moments of fitted samples to check the computation
+print("*****Emprical Moment Comparison Samples (Moment-Matched)*****")
+moments_samples = []
+for i in range(1, 11):
+    moment = np.mean(samples_post_fitted ** i)
+    moments_samples.append(moment)
+    print(f"Order {i}, Samples: {moment:.4f}")
 
 # Ensure seaborn styles are applied
 sns.set_theme(style="whitegrid")
