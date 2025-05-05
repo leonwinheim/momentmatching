@@ -13,11 +13,13 @@ import time
 import sklearn
 import gm_funcs
 import os
+import pickle as pkl
 
 #******Define testing connditions******
 np.random.seed(42)  # Set seed for reproducibility
 os.environ["LOKY_MAX_CPU_COUNT"] = "12"  # Limit the number of threads used by joblib, windows 11 stuff
 
+np.epsilon = np.finfo(float).eps  # Smallest positive number such that 1.0 + eps != 1.0
 
 # Define leaky ReLU function
 def leaky_relu(x, a):
@@ -29,10 +31,10 @@ def leaky_relu(x, a):
 #******Sample Based Moment Computation******
 # Parameters for the prior Gaussian Mixture with two components
 # a is the slope of the leaky part or the ReLU, c is the variance of the Gaussians, mu are the means of the GM, w are the weights of the GLM
-a_test = 0.05
+a_test = 1.0
 c0_test = 0.2
 c1_test = 1.2
-mu0_test = 0.0
+mu0_test = 2.0
 mu1_test = 5.0
 w0_test = 0.2
 w1_test = 0.8
@@ -47,22 +49,42 @@ samples_prior  = gm.sample(num_samples)[0]
 
 #Compute propagated samples through leaky ReLU
 samples_post = leaky_relu(samples_prior, a_test)
-
+# Save the samples as pickle
+with open('samples_post.pkl', 'wb') as f:
+    pkl.dump(samples_post, f)
 # Compute the first moments empirically
 moments_samples = []
-for i in range(1, 6):
+for i in range(1, 11):
     moment = np.mean(samples_post ** i)
     moments_samples.append(moment)
 
 # Compute the first Moments analytically
 moments_analytic = gm_funcs.compute_moments_analytic(a_test, c0_test, c1_test, mu0_test, mu1_test, w0_test, w1_test)
 
+# Prior Moments
+t1 = gm_funcs.e1_gm(w0_test,w1_test,mu0_test,mu1_test,c0_test,c1_test)
+t2 = gm_funcs.e2_gm(w0_test,w1_test,mu0_test,mu1_test,c0_test,c1_test)
+t3 = gm_funcs.e3_gm(w0_test,w1_test,mu0_test,mu1_test,c0_test,c1_test)
+t4 = gm_funcs.e4_gm(w0_test,w1_test,mu0_test,mu1_test,c0_test,c1_test)
+t5 = gm_funcs.e5_gm(w0_test,w1_test,mu0_test,mu1_test,c0_test,c1_test)
+t6 = gm_funcs.e6_gm(w0_test,w1_test,mu0_test,mu1_test,c0_test,c1_test)
+t7 = gm_funcs.e7_gm(w0_test,w1_test,mu0_test,mu1_test,c0_test,c1_test)
+t8 = gm_funcs.e8_gm(w0_test,w1_test,mu0_test,mu1_test,c0_test,c1_test)
+t9 = gm_funcs.e9_gm(w0_test,w1_test,mu0_test,mu1_test,c0_test,c1_test)
+t10 = gm_funcs.e10_gm(w0_test,w1_test,mu0_test,mu1_test,c0_test,c1_test)
+
 #******Print the result comparison******
 print("*****Moment Comparison*****")
-for i in range(1, 6):
+for i in range(1, 11):
     print(f"Order {i}, Samples: {moments_samples[i-1]:.4f}, Analytic: {moments_analytic[i-1]:.4f}")
     print(f"Rel. Error: {abs(moments_samples[i-1] - moments_analytic[i-1])/abs(moments_samples[i-1]) * 100:.2f}%")
     print("")
+
+#******Print the prior moments******
+print("*****Prior Moments*****")
+prior_moments = [t1, t2, t3, t4, t5, t6, t7, t8, t9, t10]
+for i, moment in enumerate(prior_moments, start=1):
+    print(f"Order {i}, Prior Moment: {moment:.4f}")
 
 #################################################################################
 #################################################################################
