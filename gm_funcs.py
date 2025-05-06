@@ -84,65 +84,186 @@ def e19(mu, c_v):
 def e20(mu, c_v):
     return 654729075*c_v**10 + 6547290750*c_v**9*mu**2 + 9820936125*c_v**8*mu**4 + 5237832600*c_v**7*mu**6 + 1309458150*c_v**6*mu**8 + 174594420*c_v**5*mu**10 + 13226850*c_v**4*mu**12 + 581400*c_v**3*mu**14 + 14535*c_v**2*mu**16 + 190*c_v*mu**18 + mu**20
 
-# Noncentral moments of a Gaussian Mixture
-def e1_gm(w0_v,w1_v,mu0_v,mu1_v,c0_v,c1_v):
-    return (w0_v*e1(mu0_v) + w1_v*e1(mu1_v))
+# Noncentral moments of a Gaussian Mixture for arbitrary many components
+def e1_gm(w: np.array, mu: np.array, c: np.array):
+    e1_gm = 0
+    for i in range(len(w)):
+        e1_gm += w[i] * e1(mu[i])
+    return e1_gm
 
-def e2_gm(w0_v,w1_v,mu0_v,mu1_v,c0_v,c1_v):
-    return (w0_v*e2(mu0_v,c0_v) + w1_v*e2(mu1_v,c1_v))
+def e2_gm(w: np.array, mu: np.array, c: np.array):
+    e2_gm = 0
+    for i in range(len(w)):
+        e2_gm += w[i] * e2(mu[i], c[i])
+    return e2_gm
 
-def e3_gm(w0_v,w1_v,mu0_v,mu1_v,c0_v,c1_v):
-    return (w0_v*e3(mu0_v,c0_v) + w1_v*e3(mu1_v,c1_v))
+def e3_gm(w: np.array, mu: np.array, c: np.array):
+    e3_gm = 0
+    for i in range(len(w)):
+        e3_gm += w[i] * e3(mu[i], c[i])
+    return e3_gm
 
-def e4_gm(w0_v,w1_v,mu0_v,mu1_v,c0_v,c1_v):
-    return (w0_v*e4(mu0_v,c0_v) + w1_v*e4(mu1_v,c1_v))
+def e4_gm(w: np.array, mu: np.array, c: np.array):
+    e4_gm = 0
+    for i in range(len(w)):
+        e4_gm += w[i] * e4(mu[i], c[i])
+    return e4_gm
 
-def e5_gm(w0_v,w1_v,mu0_v,mu1_v,c0_v,c1_v):
-    return (w0_v*e5(mu0_v,c0_v) + w1_v*e5(mu1_v,c1_v))
+def e5_gm(w: np.array, mu: np.array, c: np.array):
+    e5_gm = 0
+    for i in range(len(w)):
+        e5_gm += w[i] * e5(mu[i], c[i])
+    return e5_gm
 
-def e6_gm(w0_v,w1_v,mu0_v,mu1_v,c0_v,c1_v):
-    return (w0_v*e6(mu0_v,c0_v) + w1_v*e6(mu1_v,c1_v))
+def e6_gm(w: np.array, mu: np.array, c: np.array):
+    e6_gm = 0
+    for i in range(len(w)):
+        e6_gm += w[i] * e6(mu[i], c[i])
+    return e6_gm
 
-def e7_gm(w0_v,w1_v,mu0_v,mu1_v,c0_v,c1_v):
-    return (w0_v*e7(mu0_v,c0_v) + w1_v*e7(mu1_v,c1_v))
+def e7_gm(w: np.array, mu: np.array, c: np.array):
+    e7_gm = 0
+    for i in range(len(w)):
+        e7_gm += w[i] * e7(mu[i], c[i])
+    return e7_gm
 
-def e8_gm(w0_v,w1_v,mu0_v,mu1_v,c0_v,c1_v):
-    return (w0_v*e8(mu0_v,c0_v) + w1_v*e8(mu1_v,c1_v))
+def e8_gm(w: np.array, mu: np.array, c: np.array):
+    e8_gm = 0
+    for i in range(len(w)):
+        e8_gm += w[i] * e8(mu[i], c[i])
+    return e8_gm
 
-def e9_gm(w0_v,w1_v,mu0_v,mu1_v,c0_v,c1_v):
-    return (w0_v*e9(mu0_v,c0_v) + w1_v*e9(mu1_v,c1_v))
+def e9_gm(w: np.array, mu: np.array, c: np.array):
+    e9_gm = 0
+    for i in range(len(w)):
+        e9_gm += w[i] * e9(mu[i], c[i])
+    return e9_gm
 
-def e10_gm(w0_v,w1_v,mu0_v,mu1_v,c0_v,c1_v):
-    return (w0_v*e10(mu0_v,c0_v) + w1_v*e10(mu1_v,c1_v))
+def e10_gm(w: np.array, mu: np.array, c: np.array):
+    e10_gm = 0
+    for i in range(len(w)):
+        e10_gm += w[i] * e10(mu[i], c[i])
+    return e10_gm
 
-def e11_gm(w0_v,w1_v,mu0_v,mu1_v,c0_v,c1_v):
-    return (w0_v*e11(mu0_v,c0_v) + w1_v*e11(mu1_v,c1_v))
+def e11_gm(w: np.array, mu: np.array, c: np.array):
+    e11_gm = 0
+    for i in range(len(w)):
+        e11_gm += w[i] * e11(mu[i], c[i])
+    return e11_gm
 
-def e12_gm(w0_v, w1_v, mu0_v, mu1_v, c0_v, c1_v):
+def e12_gm(w: np.array, mu: np.array, c: np.array):
+    e12_gm = 0
+    for i in range(len(w)):
+        e12_gm += w[i] * e12(mu[i], c[i])
+    return e12_gm
+
+def e13_gm(w: np.array, mu: np.array, c: np.array):
+    e13_gm = 0
+    for i in range(len(w)):
+        e13_gm += w[i] * e13(mu[i], c[i])
+    return e13_gm
+
+def e14_gm(w: np.array, mu: np.array, c: np.array):
+    e14_gm = 0
+    for i in range(len(w)):
+        e14_gm += w[i] * e14(mu[i], c[i])
+    return e14_gm
+
+def e15_gm(w: np.array, mu: np.array, c: np.array):
+    e15_gm = 0
+    for i in range(len(w)):
+        e15_gm += w[i] * e15(mu[i], c[i])
+    return e15_gm
+
+def e16_gm(w: np.array, mu: np.array, c: np.array):
+    e16_gm = 0
+    for i in range(len(w)):
+        e16_gm += w[i] * e16(mu[i], c[i])
+    return e16_gm
+
+def e17_gm(w: np.array, mu: np.array, c: np.array):
+    e17_gm = 0
+    for i in range(len(w)):
+        e17_gm += w[i] * e17(mu[i], c[i])
+    return e17_gm
+
+def e18_gm(w: np.array, mu: np.array, c: np.array):
+    e18_gm = 0
+    for i in range(len(w)):
+        e18_gm += w[i] * e18(mu[i], c[i])
+    return e18_gm
+
+def e19_gm(w: np.array, mu: np.array, c: np.array):
+    e19_gm = 0
+    for i in range(len(w)):
+        e19_gm += w[i] * e19(mu[i], c[i])
+    return e19_gm
+
+def e20_gm(w: np.array, mu: np.array, c: np.array):
+    e20_gm = 0
+    for i in range(len(w)):
+        e20_gm += w[i] * e20(mu[i], c[i])
+    return e20_gm
+
+# Noncentral moments of a Gaussian Mixture with two components
+def e1_gm2(w0_v, w1_v, mu0_v, mu1_v, c0_v, c1_v):
+    return (w0_v * e1(mu0_v) + w1_v * e1(mu1_v))
+
+def e2_gm2(w0_v, w1_v, mu0_v, mu1_v, c0_v, c1_v):
+    return (w0_v * e2(mu0_v, c0_v) + w1_v * e2(mu1_v, c1_v))
+
+def e3_gm2(w0_v, w1_v, mu0_v, mu1_v, c0_v, c1_v):
+    return (w0_v * e3(mu0_v, c0_v) + w1_v * e3(mu1_v, c1_v))
+
+def e4_gm2(w0_v, w1_v, mu0_v, mu1_v, c0_v, c1_v):
+    return (w0_v * e4(mu0_v, c0_v) + w1_v * e4(mu1_v, c1_v))
+
+def e5_gm2(w0_v, w1_v, mu0_v, mu1_v, c0_v, c1_v):
+    return (w0_v * e5(mu0_v, c0_v) + w1_v * e5(mu1_v, c1_v))
+
+def e6_gm2(w0_v, w1_v, mu0_v, mu1_v, c0_v, c1_v):
+    return (w0_v * e6(mu0_v, c0_v) + w1_v * e6(mu1_v, c1_v))
+
+def e7_gm2(w0_v, w1_v, mu0_v, mu1_v, c0_v, c1_v):
+    return (w0_v * e7(mu0_v, c0_v) + w1_v * e7(mu1_v, c1_v))
+
+def e8_gm2(w0_v, w1_v, mu0_v, mu1_v, c0_v, c1_v):
+    return (w0_v * e8(mu0_v, c0_v) + w1_v * e8(mu1_v, c1_v))
+
+def e9_gm2(w0_v, w1_v, mu0_v, mu1_v, c0_v, c1_v):
+    return (w0_v * e9(mu0_v, c0_v) + w1_v * e9(mu1_v, c1_v))
+
+def e10_gm2(w0_v, w1_v, mu0_v, mu1_v, c0_v, c1_v):
+    return (w0_v * e10(mu0_v, c0_v) + w1_v * e10(mu1_v, c1_v))
+
+def e11_gm2(w0_v, w1_v, mu0_v, mu1_v, c0_v, c1_v):
+    return (w0_v * e11(mu0_v, c0_v) + w1_v * e11(mu1_v, c1_v))
+
+def e12_gm2(w0_v, w1_v, mu0_v, mu1_v, c0_v, c1_v):
     return (w0_v * e12(mu0_v, c0_v) + w1_v * e12(mu1_v, c1_v))
 
-def e13_gm(w0_v, w1_v, mu0_v, mu1_v, c0_v, c1_v):
+def e13_gm2(w0_v, w1_v, mu0_v, mu1_v, c0_v, c1_v):
     return (w0_v * e13(mu0_v, c0_v) + w1_v * e13(mu1_v, c1_v))
 
-def e14_gm(w0_v, w1_v, mu0_v, mu1_v, c0_v, c1_v):
+def e14_gm2(w0_v, w1_v, mu0_v, mu1_v, c0_v, c1_v):
     return (w0_v * e14(mu0_v, c0_v) + w1_v * e14(mu1_v, c1_v))
 
-def e15_gm(w0_v, w1_v, mu0_v, mu1_v, c0_v, c1_v):
+def e15_gm2(w0_v, w1_v, mu0_v, mu1_v, c0_v, c1_v):
     return (w0_v * e15(mu0_v, c0_v) + w1_v * e15(mu1_v, c1_v))
 
-def e16_gm(w0_v, w1_v, mu0_v, mu1_v, c0_v, c1_v):
+def e16_gm2(w0_v, w1_v, mu0_v, mu1_v, c0_v, c1_v):
     return (w0_v * e16(mu0_v, c0_v) + w1_v * e16(mu1_v, c1_v))
 
-def e17_gm(w0_v, w1_v, mu0_v, mu1_v, c0_v, c1_v):
+def e17_gm2(w0_v, w1_v, mu0_v, mu1_v, c0_v, c1_v):
     return (w0_v * e17(mu0_v, c0_v) + w1_v * e17(mu1_v, c1_v))
 
-def e18_gm(w0_v, w1_v, mu0_v, mu1_v, c0_v, c1_v):
+def e18_gm2(w0_v, w1_v, mu0_v, mu1_v, c0_v, c1_v):
     return (w0_v * e18(mu0_v, c0_v) + w1_v * e18(mu1_v, c1_v))
 
-def e19_gm(w0_v, w1_v, mu0_v, mu1_v, c0_v, c1_v):
+def e19_gm2(w0_v, w1_v, mu0_v, mu1_v, c0_v, c1_v):
     return (w0_v * e19(mu0_v, c0_v) + w1_v * e19(mu1_v, c1_v))
 
-def e20_gm(w0_v, w1_v, mu0_v, mu1_v, c0_v, c1_v):
+def e20_gm2(w0_v, w1_v, mu0_v, mu1_v, c0_v, c1_v):
     return (w0_v * e20(mu0_v, c0_v) + w1_v * e20(mu1_v, c1_v))
 
 # Function to compute the residuals for optimization
@@ -150,16 +271,16 @@ def residuals(params, t1, t2, t3, t4, t5, t6, t7, t8, t9, t10):
     w0_v, mu0_v, mu1_v, c0_v, c1_v = params
     w1_v = 1 - w0_v    #Attention! For more components we need to enforce the weights will be 1 in sum differently
     r = np.array([
-        e1_gm(w0_v,w1_v,mu0_v,mu1_v,c0_v,c1_v) - t1,
-        e2_gm(w0_v,w1_v,mu0_v,mu1_v,c0_v,c1_v) - t2,
-        e3_gm(w0_v,w1_v,mu0_v,mu1_v,c0_v,c1_v) - t3,
-        e4_gm(w0_v,w1_v,mu0_v,mu1_v,c0_v,c1_v) - t4,
-        e5_gm(w0_v,w1_v,mu0_v,mu1_v,c0_v,c1_v) - t5,
-        e6_gm(w0_v,w1_v,mu0_v,mu1_v,c0_v,c1_v) - t6,
-        e7_gm(w0_v,w1_v,mu0_v,mu1_v,c0_v,c1_v) - t7,
-        e8_gm(w0_v,w1_v,mu0_v,mu1_v,c0_v,c1_v) - t8,
-        e9_gm(w0_v,w1_v,mu0_v,mu1_v,c0_v,c1_v) - t9,
-        e10_gm(w0_v,w1_v,mu0_v,mu1_v,c0_v,c1_v) - t10
+        e1_gm2(w0_v,w1_v,mu0_v,mu1_v,c0_v,c1_v) - t1,
+        e2_gm2(w0_v,w1_v,mu0_v,mu1_v,c0_v,c1_v) - t2,
+        e3_gm2(w0_v,w1_v,mu0_v,mu1_v,c0_v,c1_v) - t3,
+        e4_gm2(w0_v,w1_v,mu0_v,mu1_v,c0_v,c1_v) - t4,
+        e5_gm2(w0_v,w1_v,mu0_v,mu1_v,c0_v,c1_v) - t5,
+        e6_gm2(w0_v,w1_v,mu0_v,mu1_v,c0_v,c1_v) - t6,
+        e7_gm2(w0_v,w1_v,mu0_v,mu1_v,c0_v,c1_v) - t7,
+        e8_gm2(w0_v,w1_v,mu0_v,mu1_v,c0_v,c1_v) - t8,
+        e9_gm2(w0_v,w1_v,mu0_v,mu1_v,c0_v,c1_v) - t9,
+        e10_gm2(w0_v,w1_v,mu0_v,mu1_v,c0_v,c1_v) - t10
     ], dtype=float)
 
     return r
@@ -169,16 +290,16 @@ def residuals_weighted(params, t1, t2, t3, t4, t5, t6, t7, t8, t9, t10):
     w0_v, mu0_v, mu1_v, c0_v, c1_v = params
     w1_v = 1 - w0_v    #Attention! For more components we need to enforce the weights will be 1 in sum differently
     r = np.array([
-        ((e1_gm(w0_v,w1_v,mu0_v,mu1_v,c0_v,c1_v) - t1) / t1),
-        ((e2_gm(w0_v,w1_v,mu0_v,mu1_v,c0_v,c1_v) - t2) / t2),
-        ((e3_gm(w0_v,w1_v,mu0_v,mu1_v,c0_v,c1_v) - t3) / t3),
-        ((e4_gm(w0_v,w1_v,mu0_v,mu1_v,c0_v,c1_v) - t4) / t4),
-        ((e5_gm(w0_v,w1_v,mu0_v,mu1_v,c0_v,c1_v) - t5) / t5),
-        ((e6_gm(w0_v,w1_v,mu0_v,mu1_v,c0_v,c1_v) - t6) / t6),
-        ((e7_gm(w0_v,w1_v,mu0_v,mu1_v,c0_v,c1_v) - t7) / t7),
-        ((e8_gm(w0_v,w1_v,mu0_v,mu1_v,c0_v,c1_v) - t8) / t8),
-        ((e9_gm(w0_v,w1_v,mu0_v,mu1_v,c0_v,c1_v) - t9) / t9),
-        ((e10_gm(w0_v,w1_v,mu0_v,mu1_v,c0_v,c1_v) - t10) / t10)
+        abs((e1_gm2(w0_v,w1_v,mu0_v,mu1_v,c0_v,c1_v) - t1) / t1),
+        abs((e2_gm2(w0_v,w1_v,mu0_v,mu1_v,c0_v,c1_v) - t2) / t2),
+        abs((e3_gm2(w0_v,w1_v,mu0_v,mu1_v,c0_v,c1_v) - t3) / t3),
+        abs((e4_gm2(w0_v,w1_v,mu0_v,mu1_v,c0_v,c1_v) - t4) / t4),
+        abs((e5_gm2(w0_v,w1_v,mu0_v,mu1_v,c0_v,c1_v) - t5) / t5),
+        abs((e6_gm2(w0_v,w1_v,mu0_v,mu1_v,c0_v,c1_v) - t6) / t6),
+        abs((e7_gm2(w0_v,w1_v,mu0_v,mu1_v,c0_v,c1_v) - t7) / t7),
+        abs((e8_gm2(w0_v,w1_v,mu0_v,mu1_v,c0_v,c1_v) - t8) / t8),
+        abs((e9_gm2(w0_v,w1_v,mu0_v,mu1_v,c0_v,c1_v) - t9) / t9),
+        abs((e10_gm2(w0_v,w1_v,mu0_v,mu1_v,c0_v,c1_v) - t10) / t10)
     ], dtype=float)
 
     return r
@@ -265,5 +386,5 @@ def fit_gm_moments(params,args):
     Fit the Gaussian Mixture model to the moments using least squares optimization.
     """
     # Call optimizer with bounds
-    result = least_squares(residuals_weighted, params, args=args, bounds=([0, -np.inf, -np.inf, 0, 0], [np.inf, np.inf, np.inf, np.inf, np.inf]))
+    result = least_squares(residuals_weighted, params, args=args, bounds=([0, -np.inf, -np.inf, 0, 0], [1.0, np.inf, np.inf, np.inf, np.inf]))
     return result
