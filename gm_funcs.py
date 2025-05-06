@@ -50,11 +50,11 @@ def  e2(mu,c_v):
 def  e3(mu,c_v):
     return 3*c_v*mu+mu**3
 def  e4(mu,c_v):
-    return mu**4+6*(mu**2)*c_v+3*c_v**2
+    return 3*c_v**2 + 6*c_v*mu**2 + mu**4
 def  e5(mu,c_v):
-    return mu**5+10*(mu**3)*c_v+15*mu*c_v**2
+    return 15*c_v**2*mu + 10*c_v*mu**3 + mu**5
 def e6(mu, c_v):
-    return 15*c_v**3+45*(c_v**2)*(mu**2)+15*mu**4+mu**6
+    return 15*c_v**3 + 45*c_v**2*mu**2 + 15*c_v*mu**4 + mu**6
 def e7(mu, c_v):
     return 105*mu*(c_v**3)+105*(c_v**2)*(mu**3)+21*(mu**5)*c_v+mu**7
 def e8(mu, c_v):    
@@ -247,6 +247,7 @@ print("")
 def compute_moments_analytic(a_test, c0_test, c1_test, mu0_test, mu1_test, w0_test, w1_test):
     """
     Compute the moments for a two component Gaussian Mixture analytically using the provided parameters.
+    c is the covariance, will be replaced with stddev in the function itself
     """
 
     # Substitute Values (Take care for variance and stddev)
