@@ -266,6 +266,124 @@ def e19_gm2(w0_v, w1_v, mu0_v, mu1_v, c0_v, c1_v):
 def e20_gm2(w0_v, w1_v, mu0_v, mu1_v, c0_v, c1_v):
     return (w0_v * e20(mu0_v, c0_v) + w1_v * e20(mu1_v, c1_v))
 
+# Next generation of functions
+def moments_pre_act_single(mu_w:np.ndarray,c_w:np.ndarray,mu_z:np.ndarray,c_z:np.ndarray,w_z:np.ndarray):
+    """This function computes the first ten moments of the random variable product w*z_in, 
+        where z_in is a scalar Gaussian Mixture with arbitrary number of components and w is a Gaussian random variable.
+
+        mu_w: Mean of the Gaussian random variable w
+        c_w: Variance of the Gaussian random variable w
+        mu_z: Mean vector of the Gaussian Mixture
+        c_z: Variance array of the Gaussian Mixture
+        w_z: Weights of the Gaussian Mixture
+
+        Returns: A vector of the first ten moments of the random variable product w*z_in
+        """
+    # Check ths shape parameters of the GM
+    assert len(mu_z) == len(c_z) == len(w_z), "mu_z, c_z, and w_z must have the same length"
+    assert len(mu_z) == len(c_z) == 1 , "mu_z and c_z must have the same length"
+    assert np.isclose(np.sum(w_z), 1.0), "Weights of the Gaussian Mixture must sum to 1"
+
+    # Initialize result vector 
+    result = np.zeros(len(mu_z), dtype=float)
+
+    #Iterate over the components of the GM
+    for i in range(len(mu_z)):
+        assert c_z[i] >= 0, "Variance must be non-negative"
+        # Add moments up to ten for each component
+        result[0] += w_z[i] * mu_w * mu_z[i]    #First Moment
+        result[1] += w_z[i] * (mu_w**2 + c_w[i]) * (c_z[i] + mu_z[i]**2)    #Second Moment
+        result[2] += w_z[i] * mu_w *mu_z[i]*(mu_w**2+3*c_w)*(mu_z[i]**2+3*c_z[i])    #Third Moment
+        result[3] += w_z[i] * (mu_w**4+6*mu_w**2*c_w+3*c_w**2)*(mu_z[i]**4+6*mu_z[i]**2*c_z[i]+3*c_z[i]**2)  #Fourth Moment
+        result[4] += w_z[i] * mu_w*mu_z[i]*(mu_w**4 +10*mu_w**2*c_w+15*c_w**2)*(mu_z[i]**4+10*mu_z[i]**2*c_z[i]+15*c_z[i]**2)  #Fifth Moment
+        result[5] += w_z[i] * (mu_w**6+15*mu_w**4*c_w+45*mu_w**2*c_w**2+15*c_w**3)*(mu_z[i]**6+15*mu_z[i]**4*c_z[i]+45*mu_z[i]**2*c_z[i]**2+15*c_z[i]**3)  #Sixth Moment
+        result[6] += w_z[i] * mu_w*mu_z[i]*(mu_w**6+21*mu_w**4*c_w+105*mu_w**2*c_w**2+105*c_w**3)*(mu_z[i]**6+21*mu_z[i]**4*c_z[i]+105*mu_z[i]**2*c_z[i]**2+105*c_z[i]**3)  #Seventh Moment
+        result[7] += w_z[i] * (mu_w**8+28*mu_w**6*c_w+210*mu_w**4*c_w**2+420*mu_w**2*c_w**3+28*c_w**4)*(mu_z[i]**8+28*mu_z[i]**6*c_z[i]+210*mu_z[i]**4*c_z[i]**2+420*mu_z[i]**2*c_z[i]**3+28*c_z[i]**4)  #Eighth Moment
+        result[8] += w_z[i] * mu_w*mu_z[i]*(mu_w**8+36*mu_w**6*c_w+378*mu_w**4*c_w**2+1260*mu_w**2*c_w**3+378*c_w**4)*(mu_z[i]**8+36*mu_z[i]**6*c_z[i]+378*mu_z[i]**4*c_z[i]**2+1260*mu_z[i]**2*c_z[i]**3+378*c_z[i]**4)  #Ninth Moment
+        result[9] += w_z[i] * (mu_w**10+45*mu_w**8*c_w+630*mu_w**6*c_w**2+3150*mu_w**4*c_w**3+4725*mu_w**2*c_w**4+945*c_w**5)*(mu_z[i]**10+45*mu_z[i]**8*c_z[i]+630*mu_z[i]**6*c_z[i]**2+3150*mu_z[i]**4*c_z[i]**3+4725*mu_z[i]**2*c_z[i]**4+945*c_z[i]**5)  #Tenth Moment
+
+    return result
+
+def moments_pre_act_combined(w_list,z_list):
+    """ This function computes the first ten moments of the pre activation value for a single neuron with multiple products of random variables.
+
+        w_list is a list containing tuples of the form (mu_w, c_w) for every entry repsresenting the weights as Gaussian
+        z_list is a list containing tuples of the form (mu_z, c_z, w_z) for every entry representing the inputs as GM
+
+        returns a vector of the first ten moments of the pre activation value
+    """
+
+    assert len(w_list) == len(z_list), "w_list and z_list must have the same length"
+
+    # Initialize result vector 
+    result = np.zeros(len(w_list), dtype=float)
+
+    # Iterate through the list
+    for i in range(len(w_list)):
+        mu_w, c_w = w_list[i]
+        mu_z, c_z, w_z = z_list[i]
+
+        # Call the moments_pre_act_single function for each entry
+        result += moments_pre_act_single(mu_w,c_w,mu_z,c_z,w_z)
+
+    return result
+
+def moments_post_act(a:float,mu:np.ndarray,c:np.ndarray,w:np.ndarray):
+    """This function computes the post activation moments of a Gaussian mixture with arbitrary many components propagated through leaky relu
+    
+        a: slope of the leaky relu
+        mu: mean vector of the Gaussian Mixture
+        c: variance array of the Gaussian Mixture
+        w: weights of the Gaussian Mixture
+
+        returns the first ten moments of the post activation distribution
+    """
+    assert len(mu) == len(c) == len(w), "mu, c, and w must have the same length"
+    sigma = np.sqrt(c)
+
+    # Initialize result vector 
+    result = np.zeros(len(mu), dtype=float)
+
+    # Iterate over components of the GM
+    for i in range(len(mu)):
+        print("Prüfe ob das stimmt!!!")
+        result[0] += (((1 + erf(mu[i]/(np.sqrt(2)*sigma[i])))*mu[i])/2 +(a*erfc(mu[i]/(np.sqrt(2)*sigma[i]))*mu[i])/2 + 
+                      sigma[i]/(np.exp(mu[i]**2/(2*sigma[i]**2))*np.sqrt(2*np.pi)) - (a*sigma[i])/(np.exp(mu[i]**2/(2*sigma[i]**2))*np.sqrt(2*np.pi)))*w[i]
+        result[1] += ((mu[i]*sigma[i])/(np.exp(mu[i]**2/(2*sigma[i]**2))*np.sqrt(2*np.pi)) -(a**2*mu[i]*sigma[i])/(np.exp(mu[i]**2/(2*sigma[i]**2))*np.sqrt(2*np.pi)) + 
+                      ((1 + erf(mu[i]/(np.sqrt(2)*sigma[i])))*(mu[i]**2 + sigma[i]**2))/2 + (a**2*erfc(mu[i]/(np.sqrt(2)*sigma[i]))*(mu[i]**2 + sigma[i]**2))/2)*w[i]
+        result[2] += ((sigma[i]*(mu[i]**2 + 2*sigma[i]**2))/(np.exp(mu[i]**2/(2*sigma[i]**2))*np.sqrt(2*np.pi)) - (a**3*sigma[i]*(mu[i]**2 + 2*sigma[i]**2))/(np.exp(mu[i]**2/(2*sigma[i]**2))*np.sqrt(2*np.pi)) + 
+                      ((1 + erf(mu[i]/(np.sqrt(2)*sigma[i])))*mu[i]*(mu[i]**2 + 3*sigma[i]**2))/2 + (a**3*erfc(mu[i]/(np.sqrt(2)*sigma[i]))*mu[i]*(mu[i]**2 + 3*sigma[i]**2))/2)*w[i]
+        result[3] += ((mu[i]*sigma[i]*(mu[i]**2 + 5*sigma[i]**2))/(np.exp(mu[i]**2/(2*sigma[i]**2))*np.sqrt(2*np.pi)) - (a**4*mu[i]*sigma[i]*(mu[i]**2 + 
+                        5*sigma[i]**2))/(np.exp(mu[i]**2/(2*sigma[i]**2))*np.sqrt(2*np.pi)) + ((1 + erf(mu[i]/(np.sqrt(2)*sigma[i])))*(mu[i]**4 + 6*mu[i]**2*sigma[i]**2 + 3*sigma[i]**4))/2 + (a**4*erfc(mu[i]/(np.sqrt(2)*sigma[i]))*(mu[i]**4 + 6*mu[i]**2*sigma[i]**2 + 3*sigma[i]**4))/2)*w[i]
+        result[4] += ((sigma[i]*(mu[i]**2 + sigma[i]**2)*(mu[i]**2 + 8*sigma[i]**2))/(np.exp(mu[i]**2/(2*sigma[i]**2))*np.sqrt(2*np.pi)) 
+                    - (a**5*sigma[i]*(mu[i]**2 + sigma[i]**2)*(mu[i]**2 + 8*sigma[i]**2))/(np.exp(mu[i]**2/(2*sigma[i]**2))*np.sqrt(2*np.pi)) 
+                    + ((1 + erf(mu[i]/(np.sqrt(2)*sigma[i])))*mu[i]*(mu[i]**4 + 10*mu[i]**2*sigma[i]**2 + 15*sigma[i]**4))/2 
+                    + (a**5*erfc(mu[i]/(np.sqrt(2)*sigma[i]))*mu[i]*(mu[i]**4 + 10*mu[i]**2*sigma[i]**2 + 15*sigma[i]**4))/2)*w[i]
+        result[5] += ((mu[i] * sigma[i] * (mu[i]**4 + 14 * mu[i]**2 * sigma[i]**2 + 33 * sigma[i]**4)) / (np.exp(mu[i]**2 / (2 * sigma[i]**2)) * np.sqrt(2 * np.pi))
+                    - (a**6 * mu[i] * sigma[i] * (mu[i]**4 + 14 * mu[i]**2 * sigma[i]**2 + 33 * sigma[i]**4)) / (np.exp(mu[i]**2 / (2 * sigma[i]**2)) * np.sqrt(2 * np.pi))
+                    + ((1 + erf(mu[i] / (np.sqrt(2) * sigma[i]))) * (mu[i]**6 + 15 * mu[i]**4 * sigma[i]**2 + 45 * mu[i]**2 * sigma[i]**4 + 15 * sigma[i]**6)) / 2
+                    + (a**6 * erfc(mu[i] / (np.sqrt(2) * sigma[i])) * (mu[i]**6 + 15 * mu[i]**4 * sigma[i]**2 + 45 * mu[i]**2 * sigma[i]**4 + 15 * sigma[i]**6)) / 2) * w[i]
+        result[6] += ((sigma[i]*(mu[i]**6 + 20*mu[i]**4*sigma[i]**2 + 87*mu[i]**2*sigma[i]**4 + 48*sigma[i]**6))/(np.exp(mu[i]**2/(2*sigma[i]**2))*np.sqrt(2*np.pi))
+                    - (a**7*sigma[i]*(mu[i]**6 + 20*mu[i]**4*sigma[i]**2 + 87*mu[i]**2*sigma[i]**4 + 48*sigma[i]**6))/(np.exp(mu[i]**2/(2*sigma[i]**2))*np.sqrt(2*np.pi))
+                    + ((1 + erf(mu[i]/(np.sqrt(2)*sigma[i])))*mu[i]*(mu[i]**6 + 21*mu[i]**4*sigma[i]**2 + 105*mu[i]**2*sigma[i]**4 + 105*sigma[i]**6))/2
+                    + (a**7*erfc(mu[i]/(np.sqrt(2)*sigma[i]))*mu[i]*(mu[i]**6 + 21*mu[i]**4*sigma[i]**2 + 105*mu[i]**2*sigma[i]**4 + 105*sigma[i]**6))/2) * w[i]
+        result[7] += ((mu[i] * sigma[i] * (mu[i]**6 + 27 * mu[i]**4 * sigma[i]**2 + 185 * mu[i]**2 * sigma[i]**4 + 279 * sigma[i]**6)) /
+                    (np.exp(mu[i]**2 / (2 * sigma[i]**2)) * np.sqrt(2 * np.pi))
+                    - (a**8 * mu[i] * sigma[i] * (mu[i]**6 + 27 * mu[i]**4 * sigma[i]**2 + 185 * mu[i]**2 * sigma[i]**4 + 279 * sigma[i]**6)) /
+                    (np.exp(mu[i]**2 / (2 * sigma[i]**2)) * np.sqrt(2 * np.pi))
+                    + ((1 + erf(mu[i] / (np.sqrt(2) * sigma[i]))) * (mu[i]**8 + 28 * mu[i]**6 * sigma[i]**2 + 210 * mu[i]**4 * sigma[i]**4 + 420 * mu[i]**2 * sigma[i]**6 + 105 * sigma[i]**8)) / 2
+                    + (a**8 * erfc(mu[i] / (np.sqrt(2) * sigma[i])) * (mu[i]**8 + 28 * mu[i]**6 * sigma[i]**2 + 210 * mu[i]**4 * sigma[i]**4 + 420 * mu[i]**2 * sigma[i]**6 + 105 * sigma[i]**8)) / 2) * w[i]
+        result[8] += ((sigma[i]*(mu[i]**8 + 35*mu[i]**6*sigma[i]**2 + 345*mu[i]**4*sigma[i]**4 + 975*mu[i]**2*sigma[i]**6 + 384*sigma[i]**8))/(np.exp(mu[i]**2/(2*sigma[i]**2))*np.sqrt(2*np.pi))
+                    - (a**9*sigma[i]*(mu[i]**8 + 35*mu[i]**6*sigma[i]**2 + 345*mu[i]**4*sigma[i]**4 + 975*mu[i]**2*sigma[i]**6 + 384*sigma[i]**8))/(np.exp(mu[i]**2/(2*sigma[i]**2))*np.sqrt(2*np.pi))
+                    + ((1 + erf(mu[i]/(np.sqrt(2)*sigma[i])))*mu[i]*(mu[i]**8 + 36*mu[i]**6*sigma[i]**2 + 378*mu[i]**4*sigma[i]**4 + 1260*mu[i]**2*sigma[i]**6 + 945*sigma[i]**8))/2
+                    + (a**9*erfc(mu[i]/(np.sqrt(2)*sigma[i]))*mu[i]*(mu[i]**8 + 36*mu[i]**6*sigma[i]**2 + 378*mu[i]**4*sigma[i]**4 + 1260*mu[i]**2*sigma[i]**6 + 945*sigma[i]**8))/2) * w[i]
+        result[9] += w[i] * ((mu[i] * sigma[i] * (mu[i]**8 + 44 * mu[i]**6 * sigma[i]**2 + 588 * mu[i]**4 * sigma[i]**4 + 2640 * mu[i]**2 * sigma[i]**6 + 2895 * sigma[i]**8)) / (np.exp(mu[i]**2 / (2 * sigma[i]**2)) * np.sqrt(2 * np.pi))
+                    + ((1 + erf(mu[i] / (np.sqrt(2) * sigma[i]))) * (mu[i]**10 + 45 * mu[i]**8 * sigma[i]**2 + 630 * mu[i]**6 * sigma[i]**4 + 3150 * mu[i]**4 * sigma[i]**6 + 4725 * mu[i]**2 * sigma[i]**8 + 945 * sigma[i]**10)) / 2
+                    + (a**10 * (-np.sqrt(2 / np.pi) * mu[i] * sigma[i] * (mu[i]**8 + 44 * mu[i]**6 * sigma[i]**2 + 588 * mu[i]**4 * sigma[i]**4 + 2640 * mu[i]**2 * sigma[i]**6 + 2895 * sigma[i]**8) / np.exp(mu[i]**2 / (2 * sigma[i]**2)) + 
+                        erfc(mu[i] / (np.sqrt(2) * sigma[i])) * (mu[i]**10 + 45 * mu[i]**8 * sigma[i]**2 + 630 * mu[i]**6 * sigma[i]**4 + 3150 * mu[i]**4 * sigma[i]**6 + 4725 * mu[i]**2 * sigma[i]**8 + 945 * sigma[i]**10)) / 2))
+        
+    return result
+    
 # Function to compute the residuals for optimization
 def residuals(params, t1, t2, t3, t4, t5, t6, t7, t8, t9, t10):
     w0_v, mu0_v, mu1_v, c0_v, c1_v = params
@@ -370,7 +488,6 @@ def compute_moments_analytic(a_test, c0_test, c1_test, mu0_test, mu1_test, w0_te
     Compute the moments for a two component Gaussian Mixture analytically using the provided parameters.
     c is the covariance, will be replaced with stddev in the function itself
     """
-
     # Substitute Values (Take care for variance and stddev)
     values = {a: a_test, c0: np.sqrt(c0_test), c1:np.sqrt(c1_test), mu0: mu0_test, mu1:mu1_test, w0: w0_test, w1: w1_test}
     moments_analytic = []
