@@ -267,6 +267,61 @@ def e20_gm2(w0_v, w1_v, mu0_v, mu1_v, c0_v, c1_v):
     return (w0_v * e20(mu0_v, c0_v) + w1_v * e20(mu1_v, c1_v))
 
 # Next generation of functions
+def moments_pre_act_single_det(x,mu_w,c_w):
+    """This function computes the first ten moments of the random variable product w*x, 
+        where z_in is a dseterministic scalar valkue and w is a Gaussian random variable.
+
+        x: The input value
+        mu_w: Mean of the Gaussian random variable w
+        c_w: Variance of the Gaussian random variable w
+
+        Returns: A vector of the first ten moments of the random variable product w*x
+        """
+    # Check the shape of the input
+    assert x.shape == (1,), "x must be a scalar value"
+
+    # Initialize result vector 
+    result = np.zeros(10, dtype=float)
+
+    result[0] = x*e1(mu_w)           #First Moment
+    result[1] = x**2*e2(mu_w,c_w)    #Second Moment
+    result[2] = x**3*e3(mu_w,c_w)    #Third Moment
+    result[3] = x**4*e4(mu_w,c_w)    #Fourth Moment
+    result[4] = x**5*e5(mu_w,c_w)    #Fifth Moment
+    result[5] = x**6*e6(mu_w,c_w)    #Sixth Moment
+    result[6] = x**7*e7(mu_w,c_w)    #Seventh Moment
+    result[7] = x**8*e8(mu_w,c_w)    #Eighth Moment
+    result[8] = x**9*e9(mu_w,c_w)    #Ninth Moment
+    result[9] = x**10*e10(mu_w,c_w)  #Tenth Moment
+
+    return result
+
+
+def moments_pre_act_combined_det(x_list,w_list):
+    """ This function computes the first ten moments of the pre activation value for a single neuron with multiple products input and weight.
+
+        x_list is a list containing the input values
+        w_list is a list containing tuples of the form (mu_w, c_w) for every entry repsresenting the weights as Gaussian
+
+        returns a vector of the first ten moments of the pre activation value
+    """
+
+    assert len(x_list) == len(w_list), "x_list and w_list must have the same length"
+
+    # Initialize result vector 
+    result = np.zeros(len(x_list), dtype=float)
+
+    # Iterate through the list
+    for i in range(len(x_list)):
+        x = x_list[i]
+        mu_w, c_w = w_list[i]
+
+        # Call the moments_pre_act_single function for each entry
+        result += moments_pre_act_single_det(x,mu_w,c_w)
+
+    return result
+
+
 def moments_pre_act_single(mu_w:np.ndarray,c_w:np.ndarray,mu_z:np.ndarray,c_z:np.ndarray,w_z:np.ndarray):
     """This function computes the first ten moments of the random variable product w*z_in, 
         where z_in is a scalar Gaussian Mixture with arbitrary number of components and w is a Gaussian random variable.
@@ -505,3 +560,125 @@ def fit_gm_moments(params,args):
     # Call optimizer with bounds
     result = least_squares(residuals_weighted, params, args=args, bounds=([0, -np.inf, -np.inf, 0, 0], [1.0, np.inf, np.inf, np.inf, np.inf]))
     return result
+
+
+#########################################################################################   
+# Define the network class to build actual architecture
+
+class GaussianMixtureNetwork():
+    """
+    Class to build a Gaussian Mixture based BNN. Numpy-Based
+    """
+    def __init__(self,layers:list,activations:list,components_pre:int,components_post:int,a_relu:float=0.01):
+        """
+        Initialize the Gaussian Mixture Network with the given parameters.
+
+        layers: List of integers representing the number of neurons in each layer. First is Input feautres, last is output features
+        activations: List of activation functions for each layer. Contains one entry less than layers
+        components_pre: Number of components for the pre-activation layer.
+        components_post: Number of components for the post-activation layer.
+        """
+        # Add values to instance
+        self.layers = layers
+        self.activations = activations.copy()
+        self.components_pre = components_pre
+        self.components_post = components_post
+        self.a_relu = a_relu
+
+        # Intialize the weights and biases
+        self.init_parameters()
+
+        # Reset actiuvation functions
+        self.set_act_func()
+
+        # Print out the network structure
+        self.print_network()
+
+    def init_parameters(self):
+        """Initialize the structure and the prior parameters of the network"""
+        # Initialize weight and bias values
+        self.weight_means = []
+        self.weight_variances = []
+        # Iterate over the layers
+        for i in range(len(self.layers)-1):
+            # Initialize the weights for each layer. Add 1 for the bias
+            weight_mean = np.random.normal(0, 1, (self.layers[i]+1, self.layers[i+1]))
+            self.weight_means.append(weight_mean)
+            weight_variance = np.zeros((self.layers[i]+1, self.layers[i+1]))
+            self.weight_variances.append(weight_variance)
+
+        # Initialize the containers for the GM parameters in pre-activation
+        self.means_gm_pre = []
+        self.variances_gm_pre = []
+        self.weights_gm_pre = []
+        # Iterate over the layers
+        for i in range(len(self.layers)-1):
+            # Append empty lists for each layer
+            self.means_gm_pre.append([np.zeros((self.layers[i+1], self.components_pre))])
+            self.variances_gm_pre.append([np.zeros((self.layers[i+1], self.components_pre))])
+            self.weights_gm_pre.append([np.zeros((self.layers[i+1], self.components_pre))])
+
+        # Initialize the containers for the GM parameters in post-activation
+        self.means_gm_post = []
+        self.variances_gm_post = []
+        self.weights_gm_post = []
+        # Iterate over the layers
+        for i in range(len(self.layers)-1):
+            # Append empty lists for each layer
+            self.means_gm_post.append([np.zeros((self.layers[i+1], self.components_post))])
+            self.variances_gm_post.append([np.zeros((self.layers[i+1], self.components_post))])
+            self.weights_gm_post.append([np.zeros((self.layers[i+1], self.components_post))])
+
+
+    def set_act_func(self):
+        """Set the activation functions for the network"""
+        # Initialize the activation functions
+        self.activation_functions = []
+        for i in range(len(self.layers)-1):
+            if self.activations[i] == 'relu':
+                self.activation_functions.append(self.relu)
+            if self.activations[i] == 'linear':
+                self.activation_functions.append(self.linear)
+            else:
+                raise ValueError(f"Unsupported activation function: {self.activations[i]}")
+            
+    def relu(self, x, return_name=False):
+        """General ReLU activation function with leaky parameter"""
+        if return_name:
+            return "relu"
+        a = self.a_relu  
+        return np.where(x > 0, x, a * x)
+    
+    def linear(self, x, return_name=False):  
+        """Linear activation function"""
+        if return_name:
+            return "linear"
+        return x
+
+    def print_network(self):
+        pass
+
+    def forward_moments(self,x):
+        """
+        Forward pass through the network based on the method of moments.
+        x: Input data, deterministic
+        """
+
+        assert len(x) == self.layers[0], f"Input data must have {self.layers[0]} features, but got {len(x)}"
+
+        # Indexing a GM Parameter value is done by [layer][neuron][component]
+
+        ######
+        # Handle the first layer seperately as it uses deterministic input
+        ######
+        # Match Pre-Activation
+
+        # Match Post-Activation
+
+
+        ######
+        # Iterate over the rest of the layers
+        ######
+        # Match Pre-Activation
+
+        # Match Post-Activation
