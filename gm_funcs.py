@@ -8,7 +8,7 @@ from sympy.parsing.mathematica import parse_mathematica
 from sympy import var, erf, erfc
 import sklearn
 import re
-from scipy.optimize import least_squares
+from scipy.optimize import least_squares, minimize
 
 # Replace \[Pi] with Pi in the expressions so python can read it
 def replace_pi(expression):
@@ -306,6 +306,8 @@ def moments_pre_act_combined_det(x_list,w_list):
         returns a vector of the first ten moments of the pre activation value
     """
 
+    #MISLEADING: BOTH INPUTS ARE ARRAYS
+
     assert len(x_list) == len(w_list), "x_list and w_list must have the same length"
 
     # Initialize result vector 
@@ -365,8 +367,12 @@ def moments_pre_act_combined(w_list,z_list):
         w_list is a list containing tuples of the form (mu_w, c_w) for every entry repsresenting the weights as Gaussian
         z_list is a list containing tuples of the form (mu_z, c_z, w_z) for every entry representing the inputs as GM
 
+        BUT: The last entry in z_list is deternministic as it comes from the bias neuron in the befrorehand layer
+
         returns a vector of the first ten moments of the pre activation value
     """
+
+    #MISLEADING: BOTH INPUTS ARE ARRAYS
 
     assert len(w_list) == len(z_list), "w_list and z_list must have the same length"
 
@@ -374,12 +380,17 @@ def moments_pre_act_combined(w_list,z_list):
     result = np.zeros(len(w_list), dtype=float)
 
     # Iterate through the list
-    for i in range(len(w_list)):
+    for i in range(len(w_list)-1):
         mu_w, c_w = w_list[i]
         mu_z, c_z, w_z = z_list[i]
 
         # Call the moments_pre_act_single function for each entry
         result += moments_pre_act_single(mu_w,c_w,mu_z,c_z,w_z)
+    
+    #Bias handling
+    mu_w, c_w = w_list[-1]
+    z_bias = z_list[-1,0]
+    result += moments_pre_act_single_det(z_bias,mu_w,c_w)
 
     return result
 
@@ -438,7 +449,125 @@ def moments_post_act(a:float,mu:np.ndarray,c:np.ndarray,w:np.ndarray):
                         erfc(mu[i] / (np.sqrt(2) * sigma[i])) * (mu[i]**10 + 45 * mu[i]**8 * sigma[i]**2 + 630 * mu[i]**6 * sigma[i]**4 + 3150 * mu[i]**4 * sigma[i]**6 + 4725 * mu[i]**2 * sigma[i]**8 + 945 * sigma[i]**10)) / 2))
         
     return result
+
+def residuals_matching(params, t):
+    """Compute the residual value for the optimization process."""
+    # Infer how many components we have
+    components = int(len(params)/3)
+    # Extract the parameters from the input vector
+    w = params[:components]
+    mu = params[components:components*2]
+    c = params[components*2:components*3]
+
+    # Compute the moments of the Gaussian Mixture
+    gm_moments = np.zeros(10, dtype=float)
+    gm_moments[0] = e1_gm(w, mu, c)
+    gm_moments[1] = e2_gm(w, mu, c)
+    gm_moments[2] = e3_gm(w, mu, c)
+    gm_moments[3] = e4_gm(w, mu, c)
+    gm_moments[4] = e5_gm(w, mu, c)
+    gm_moments[5] = e6_gm(w, mu, c)
+    gm_moments[6] = e7_gm(w, mu, c)
+    gm_moments[7] = e8_gm(w, mu, c)
+    gm_moments[8] = e9_gm(w, mu, c)
+    gm_moments[9] = e10_gm(w, mu, c)
+
+    # Compute the weighted residuals
+    residuals = np.zeros(10, dtype=float)
+    for i in range(10):
+        residuals[i] = abs(gm_moments[i] - t[i])/t[i]
+
+    # This should return a scalar value
+    return residuals
+
+def residual_sum_matching(params, t):
+    """Compute the residual value for the optimization process."""
+    # Infer how many components we have
+    components = int(len(params)/3)
+    # Extract the parameters from the input vector
+    w = params[:components]
+    mu = params[components:components*2]
+    c = params[components*2:components*3]
+
+    # Compute the moments of the Gaussian Mixture
+    gm_moments = np.zeros(10, dtype=float)
+    gm_moments[0] = e1_gm(w, mu, c)
+    gm_moments[1] = e2_gm(w, mu, c)
+    gm_moments[2] = e3_gm(w, mu, c)
+    gm_moments[3] = e4_gm(w, mu, c)
+    gm_moments[4] = e5_gm(w, mu, c)
+    gm_moments[5] = e6_gm(w, mu, c)
+    gm_moments[6] = e7_gm(w, mu, c)
+    gm_moments[7] = e8_gm(w, mu, c)
+    gm_moments[8] = e9_gm(w, mu, c)
+    gm_moments[9] = e10_gm(w, mu, c)
+
+    # Compute the weighted residuals
+    residuals = np.zeros(10, dtype=float)
+    for i in range(10):
+        residuals[i] = abs(gm_moments[i] - t[i])/t[i]
     
+    # Compute the sum of the residuals
+    residual_sum = np.sum(residuals)
+
+    # This should return a scalar value
+    return residual_sum
+
+
+def match_moments(in_mom,components):
+    """Function to perform the moment matching for given Moments and a desired number of components."""
+
+    assert components < 3, "Number of components too hihg for number of moments"
+
+    # Assemble the parameter vector according to the number of components. Per Component, we have 3 parameters: w, mu, c
+    # The complete parameter vector will look like this: [w0,w1...,wN,mu0,mu1,...,muN,c0,c1,...,cN]
+    params = np.zeros(components*3, dtype=float)
+
+    #Set the initial guess for the weights as equal and summing up to one
+    for i in range(components):
+        params[i] = 1/components
+
+    #Set the initial guess for the means as the input moments
+    params[components] = 0.0    # Frst Mean is zero
+    for i in range(components-1):
+        params[components+i+1] = np.random.uniform(0,1)     # Rest of the means are random
+
+    #Set the initial guess for the variances as the input moments
+    for i in range(components):
+        params[components*2+i] = 1.0     # Rest of the variances are rando
+
+    print("Initial guess for the parameters:")
+    print(params)
+
+    # Optimize this with the minimize function to add in the constraint on the sum of the weights
+    result = minimize(
+        residuals_matching,
+        params,
+        args=(in_mom,),
+        method="SLSQP",
+        bounds=[(0, 1)] * (components * 3),
+        constraints=[{'type': 'eq', 'fun': lambda x: np.sum(x[:components]) - 1}]
+    )
+    
+    return result.x
+
+def match_moments_2(in_mom, components):
+    """Intermediate solution, only for two components"""
+    if components != 2:
+        raise ValueError("This function only works for two components")
+    
+    params = [0.5,0.0,1.0,1.0,1.0]  # Initial guess for [w0, mu0, mu1, c0, c1]
+
+    # Call optimizer with bounds
+    result = least_squares(residuals_weighted, params, args=in_mom, bounds=([0, -np.inf, -np.inf, 0, 0], [1.0, np.inf, np.inf, np.inf, np.inf]))
+
+    w_res = [result.x[0], 1 - result.x[0]]
+    mu_res = [result.x[1], result.x[2]]
+    c_res = [result.x[3], result.x[4]]
+
+    return mu_res, c_res, w_res
+
+
 # Function to compute the residuals for optimization
 def residuals(params, t1, t2, t3, t4, t5, t6, t7, t8, t9, t10):
     w0_v, mu0_v, mu1_v, c0_v, c1_v = params
@@ -477,81 +606,81 @@ def residuals_weighted(params, t1, t2, t3, t4, t5, t6, t7, t8, t9, t10):
 
     return r
 
-#******Store some stuff for two components and max order of 10******
-# Define the symbolic variables (exclude erf and erfc here)
-# a is the slope of the leaky part or the ReLU, c is the variance of the Gaussians, mu are the means of the GLM, w are the weights of the GLM
-a, c0, c1, mu0, mu1, w0 ,w1 = var('a c0 c1 mu0 mu1 w0 w1')
+# #******Store some stuff for two components and max order of 10******
+# # Define the symbolic variables (exclude erf and erfc here)
+# # a is the slope of the leaky part or the ReLU, c is the variance of the Gaussians, mu are the means of the GLM, w are the weights of the GLM
+# a, c0, c1, mu0, mu1, w0 ,w1 = var('a c0 c1 mu0 mu1 w0 w1')
 
-# Gaussian Mixture Moments through leaky relu.Expression from mathematica (\[]-Style expressions need to be replaced without brackets)
+# # Gaussian Mixture Moments through leaky relu.Expression from mathematica (\[]-Style expressions need to be replaced without brackets)
 
-number_of_moments = 10
+# number_of_moments = 10
 
-#These are the formulas for 2 components from mathematica
-# ATTENTION: C IST STDDEVIATION, NOT VARIANCE!
-m_raw = [None] * (number_of_moments + 1) #We need to add the zeroth moment for the loop
-m_raw[0] = None #I dont use the zeroth moment!
-m_raw[1] = r"(c[0]/(E^(mu[0]^2/(2*c[0]^2))*Sqrt[2*Pi]) - (a*c[0])/(E^(mu[0]^2/(2*c[0]^2))*Sqrt[2*Pi]) + ((1 + Erf[mu[0]/(Sqrt[2]*c[0])])*mu[0])/2 + (a*Erfc[mu[0]/(Sqrt[2]*c[0])]*mu[0])/2)*w[0] + (c[1]/(E^(mu[1]^2/(2*c[1]^2))*Sqrt[2*Pi]) - (a*c[1])/(E^(mu[1]^2/(2*c[1]^2))*Sqrt[2*Pi]) + ((1 + Erf[mu[1]/(Sqrt[2]*c[1])])*mu[1])/2 + (a*Erfc[mu[1]/(Sqrt[2]*c[1])]*mu[1])/2)*w[1]"
-m_raw[2] = r"((c[0]*mu[0])/(E^(mu[0]^2/(2*c[0]^2))*Sqrt[2*Pi]) - (a^2*c[0]*mu[0])/(E^(mu[0]^2/(2*c[0]^2))*Sqrt[2*Pi]) + ((1 + Erf[mu[0]/(Sqrt[2]*c[0])])*(c[0]^2 + mu[0]^2))/2 + (a^2*Erfc[mu[0]/(Sqrt[2]*c[0])]*(c[0]^2 + mu[0]^2))/2)*w[0] + ((c[1]*mu[1])/(E^(mu[1]^2/(2*c[1]^2))*Sqrt[2*Pi]) - (a^2*c[1]*mu[1])/(E^(mu[1]^2/(2*c[1]^2))*Sqrt[2*Pi]) + ((1 + Erf[mu[1]/(Sqrt[2]*c[1])])*(c[1]^2 + mu[1]^2))/2 + (a^2*Erfc[mu[1]/(Sqrt[2]*c[1])]*(c[1]^2 + mu[1]^2))/2)*w[1]"
-m_raw[3] = r"((c[0]*(2*c[0]^2 + mu[0]^2))/(E^(mu[0]^2/(2*c[0]^2))*Sqrt[2*Pi]) - (a^3*c[0]*(2*c[0]^2 + mu[0]^2))/(E^(mu[0]^2/(2*c[0]^2))*Sqrt[2*Pi]) + ((1 + Erf[mu[0]/(Sqrt[2]*c[0])])*mu[0]*(3*c[0]^2 + mu[0]^2))/2 + (a^3*Erfc[mu[0]/(Sqrt[2]*c[0])]*mu[0]*(3*c[0]^2 + mu[0]^2))/2)*w[0] + ((c[1]*(2*c[1]^2 + mu[1]^2))/(E^(mu[1]^2/(2*c[1]^2))*Sqrt[2*Pi]) - (a^3*c[1]*(2*c[1]^2 + mu[1]^2))/(E^(mu[1]^2/(2*c[1]^2))*Sqrt[2*Pi]) + ((1 + Erf[mu[1]/(Sqrt[2]*c[1])])*mu[1]*(3*c[1]^2 + mu[1]^2))/2 + (a^3*Erfc[mu[1]/(Sqrt[2]*c[1])]*mu[1]*(3*c[1]^2 + mu[1]^2))/2)*w[1]"
-m_raw[4] = r"((c[0]*mu[0]*(5*c[0]^2 + mu[0]^2))/(E^(mu[0]^2/(2*c[0]^2))*Sqrt[2*Pi]) - (a^4*c[0]*mu[0]*(5*c[0]^2 + mu[0]^2))/(E^(mu[0]^2/(2*c[0]^2))*Sqrt[2*Pi]) + ((1 + Erf[mu[0]/(Sqrt[2]*c[0])])*(3*c[0]^4 + 6*c[0]^2*mu[0]^2 + mu[0]^4))/2 + (a^4*Erfc[mu[0]/(Sqrt[2]*c[0])]*(3*c[0]^4 + 6*c[0]^2*mu[0]^2 + mu[0]^4))/2)*w[0] + ((c[1]*mu[1]*(5*c[1]^2 + mu[1]^2))/(E^(mu[1]^2/(2*c[1]^2))*Sqrt[2*Pi]) - (a^4*c[1]*mu[1]*(5*c[1]^2 + mu[1]^2))/(E^(mu[1]^2/(2*c[1]^2))*Sqrt[2*Pi]) + ((1 + Erf[mu[1]/(Sqrt[2]*c[1])])*(3*c[1]^4 + 6*c[1]^2*mu[1]^2 + mu[1]^4))/2 + (a^4*Erfc[mu[1]/(Sqrt[2]*c[1])]*(3*c[1]^4 + 6*c[1]^2*mu[1]^2 + mu[1]^4))/2)*w[1]"
-m_raw[5] = r"((c[0]*(c[0]^2 + mu[0]^2)*(8*c[0]^2 + mu[0]^2))/(E^(mu[0]^2/(2*c[0]^2))*Sqrt[2*Pi]) - (a^5*c[0]*(c[0]^2 + mu[0]^2)*(8*c[0]^2 + mu[0]^2))/(E^(mu[0]^2/(2*c[0]^2))*Sqrt[2*Pi]) + ((1 + Erf[mu[0]/(Sqrt[2]*c[0])])*mu[0]*(15*c[0]^4 + 10*c[0]^2*mu[0]^2 + mu[0]^4))/2 + (a^5*Erfc[mu[0]/(Sqrt[2]*c[0])]*mu[0]*(15*c[0]^4 + 10*c[0]^2*mu[0]^2 + mu[0]^4))/2)*w[0] + ((c[1]*(c[1]^2 + mu[1]^2)*(8*c[1]^2 + mu[1]^2))/(E^(mu[1]^2/(2*c[1]^2))*Sqrt[2*Pi]) - (a^5*c[1]*(c[1]^2 + mu[1]^2)*(8*c[1]^2 + mu[1]^2))/(E^(mu[1]^2/(2*c[1]^2))*Sqrt[2*Pi]) + ((1 + Erf[mu[1]/(Sqrt[2]*c[1])])*mu[1]*(15*c[1]^4 + 10*c[1]^2*mu[1]^2 + mu[1]^4))/2 + (a^5*Erfc[mu[1]/(Sqrt[2]*c[1])]*mu[1]*(15*c[1]^4 + 10*c[1]^2*mu[1]^2 + mu[1]^4))/2)*w[1]"
-m_raw[6] = r"((c[0]*mu[0]*(33*c[0]^4 + 14*c[0]^2*mu[0]^2 + mu[0]^4))/(E^(mu[0]^2/(2*c[0]^2))*Sqrt[2*Pi]) - (a^6*c[0]*mu[0]*(33*c[0]^4 + 14*c[0]^2*mu[0]^2 + mu[0]^4))/(E^(mu[0]^2/(2*c[0]^2))*Sqrt[2*Pi]) + ((1 + Erf[mu[0]/(Sqrt[2]*c[0])])*(15*c[0]^6 + 45*c[0]^4*mu[0]^2 + 15*c[0]^2*mu[0]^4 + mu[0]^6))/2 + (a^6*Erfc[mu[0]/(Sqrt[2]*c[0])]*(15*c[0]^6 + 45*c[0]^4*mu[0]^2 + 15*c[0]^2*mu[0]^4 + mu[0]^6))/2)*w[0] + ((c[1]*mu[1]*(33*c[1]^4 + 14*c[1]^2*mu[1]^2 + mu[1]^4))/(E^(mu[1]^2/(2*c[1]^2))*Sqrt[2*Pi]) - (a^6*c[1]*mu[1]*(33*c[1]^4 + 14*c[1]^2*mu[1]^2 + mu[1]^4))/(E^(mu[1]^2/(2*c[1]^2))*Sqrt[2*Pi]) + ((1 + Erf[mu[1]/(Sqrt[2]*c[1])])*(15*c[1]^6 + 45*c[1]^4*mu[1]^2 + 15*c[1]^2*mu[1]^4 + mu[1]^6))/2 + (a^6*Erfc[mu[1]/(Sqrt[2]*c[1])]*(15*c[1]^6 + 45*c[1]^4*mu[1]^2 + 15*c[1]^2*mu[1]^4 + mu[1]^6))/2)*w[1]"
-m_raw[7] = r"((c[0]*(48*c[0]^6 + 87*c[0]^4*mu[0]^2 + 20*c[0]^2*mu[0]^4 + mu[0]^6))/(E^(mu[0]^2/(2*c[0]^2))*Sqrt[2*Pi]) - (a^7*c[0]*(48*c[0]^6 + 87*c[0]^4*mu[0]^2 + 20*c[0]^2*mu[0]^4 + mu[0]^6))/(E^(mu[0]^2/(2*c[0]^2))*Sqrt[2*Pi]) + ((1 + Erf[mu[0]/(Sqrt[2]*c[0])])*mu[0]*(105*c[0]^6 + 105*c[0]^4*mu[0]^2 + 21*c[0]^2*mu[0]^4 + mu[0]^6))/2 + (a^7*Erfc[mu[0]/(Sqrt[2]*c[0])]*mu[0]*(105*c[0]^6 + 105*c[0]^4*mu[0]^2 + 21*c[0]^2*mu[0]^4 + mu[0]^6))/2)*w[0] + ((c[1]*(48*c[1]^6 + 87*c[1]^4*mu[1]^2 + 20*c[1]^2*mu[1]^4 + mu[1]^6))/(E^(mu[1]^2/(2*c[1]^2))*Sqrt[2*Pi]) - (a^7*c[1]*(48*c[1]^6 + 87*c[1]^4*mu[1]^2 + 20*c[1]^2*mu[1]^4 + mu[1]^6))/(E^(mu[1]^2/(2*c[1]^2))*Sqrt[2*Pi]) + ((1 + Erf[mu[1]/(Sqrt[2]*c[1])])*mu[1]*(105*c[1]^6 + 105*c[1]^4*mu[1]^2 + 21*c[1]^2*mu[1]^4 + mu[1]^6))/2 + (a^7*Erfc[mu[1]/(Sqrt[2]*c[1])]*mu[1]*(105*c[1]^6 + 105*c[1]^4*mu[1]^2 + 21*c[1]^2*mu[1]^4 + mu[1]^6))/2)*w[1]"
-m_raw[8] = r"((c[0]*mu[0]*(279*c[0]^6 + 185*c[0]^4*mu[0]^2 + 27*c[0]^2*mu[0]^4 + mu[0]^6))/(E^(mu[0]^2/(2*c[0]^2))*Sqrt[2*Pi]) - (a^8*c[0]*mu[0]*(279*c[0]^6 + 185*c[0]^4*mu[0]^2 + 27*c[0]^2*mu[0]^4 + mu[0]^6))/(E^(mu[0]^2/(2*c[0]^2))*Sqrt[2*Pi]) + ((1 + Erf[mu[0]/(Sqrt[2]*c[0])])*(105*c[0]^8 + 420*c[0]^6*mu[0]^2 + 210*c[0]^4*mu[0]^4 + 28*c[0]^2*mu[0]^6 + mu[0]^8))/2 + (a^8*Erfc[mu[0]/(Sqrt[2]*c[0])]*(105*c[0]^8 + 420*c[0]^6*mu[0]^2 + 210*c[0]^4*mu[0]^4 + 28*c[0]^2*mu[0]^6 + mu[0]^8))/2)*w[0] + ((c[1]*mu[1]*(279*c[1]^6 + 185*c[1]^4*mu[1]^2 + 27*c[1]^2*mu[1]^4 + mu[1]^6))/(E^(mu[1]^2/(2*c[1]^2))*Sqrt[2*Pi]) - (a^8*c[1]*mu[1]*(279*c[1]^6 + 185*c[1]^4*mu[1]^2 + 27*c[1]^2*mu[1]^4 + mu[1]^6))/(E^(mu[1]^2/(2*c[1]^2))*Sqrt[2*Pi]) + ((1 + Erf[mu[1]/(Sqrt[2]*c[1])])*(105*c[1]^8 + 420*c[1]^6*mu[1]^2 + 210*c[1]^4*mu[1]^4 + 28*c[1]^2*mu[1]^6 + mu[1]^8))/2 + (a^8*Erfc[mu[1]/(Sqrt[2]*c[1])]*(105*c[1]^8 + 420*c[1]^6*mu[1]^2 + 210*c[1]^4*mu[1]^4 + 28*c[1]^2*mu[1]^6 + mu[1]^8))/2)*w[1]"
-m_raw[9] = r"(-((a^9*c[0]*(384*c[0]^8 + 975*c[0]^6*mu[0]^2 + 345*c[0]^4*mu[0]^4 + 35*c[0]^2*mu[0]^6 + mu[0]^8))/(E^(mu[0]^2/(2*c[0]^2))*Sqrt[2*Pi])) + (a^9*Erfc[mu[0]/(Sqrt[2]*c[0])]*mu[0]*(945*c[0]^8 + 1260*c[0]^6*mu[0]^2 + 378*c[0]^4*mu[0]^4 + 36*c[0]^2*mu[0]^6 + mu[0]^8))/2 + (945*c[0]^8*mu[0] + 1260*c[0]^6*mu[0]^3 + 378*c[0]^4*mu[0]^5 + 36*c[0]^2*mu[0]^7 + mu[0]^9 + (Sqrt[2/Pi]*c[0]*(384*c[0]^8 + 975*c[0]^6*mu[0]^2 + 345*c[0]^4*mu[0]^4 + 35*c[0]^2*mu[0]^6 + mu[0]^8))/E^(mu[0]^2/(2*c[0]^2)) + Erf[mu[0]/(Sqrt[2]*c[0])]*(945*c[0]^8*mu[0] + 1260*c[0]^6*mu[0]^3 + 378*c[0]^4*mu[0]^5 + 36*c[0]^2*mu[0]^7 + mu[0]^9))/2)*w[0] + (-((a^9*c[1]*(384*c[1]^8 + 975*c[1]^6*mu[1]^2 + 345*c[1]^4*mu[1]^4 + 35*c[1]^2*mu[1]^6 + mu[1]^8))/(E^(mu[1]^2/(2*c[1]^2))*Sqrt[2*Pi])) + (a^9*Erfc[mu[1]/(Sqrt[2]*c[1])]*mu[1]*(945*c[1]^8 + 1260*c[1]^6*mu[1]^2 + 378*c[1]^4*mu[1]^4 + 36*c[1]^2*mu[1]^6 + mu[1]^8))/2 + (945*c[1]^8*mu[1] + 1260*c[1]^6*mu[1]^3 + 378*c[1]^4*mu[1]^5 + 36*c[1]^2*mu[1]^7 + mu[1]^9 + (Sqrt[2/Pi]*c[1]*(384*c[1]^8 + 975*c[1]^6*mu[1]^2 + 345*c[1]^4*mu[1]^4 + 35*c[1]^2*mu[1]^6 + mu[1]^8))/E^(mu[1]^2/(2*c[1]^2)) + Erf[mu[1]/(Sqrt[2]*c[1])]*(945*c[1]^8*mu[1] + 1260*c[1]^6*mu[1]^3 + 378*c[1]^4*mu[1]^5 + 36*c[1]^2*mu[1]^7 + mu[1]^9))/2)*w[1]"
-m_raw[10]= r"((c[0]*mu[0]*(2895*c[0]^8 + 2640*c[0]^6*mu[0]^2 + 588*c[0]^4*mu[0]^4 + 44*c[0]^2*mu[0]^6 + mu[0]^8))/(E^(mu[0]^2/(2*c[0]^2))*Sqrt[2*Pi]) + ((1 + Erf[mu[0]/(Sqrt[2]*c[0])])*(945*c[0]^10 + 4725*c[0]^8*mu[0]^2 + 3150*c[0]^6*mu[0]^4 + 630*c[0]^4*mu[0]^6 + 45*c[0]^2*mu[0]^8 + mu[0]^10))/2 + (a^10*(-((Sqrt[2/Pi]*c[0]*mu[0]*(2895*c[0]^8 + 2640*c[0]^6*mu[0]^2 + 588*c[0]^4*mu[0]^4 + 44*c[0]^2*mu[0]^6 + mu[0]^8))/E^(mu[0]^2/(2*c[0]^2))) + Erfc[mu[0]/(Sqrt[2]*c[0])]*(945*c[0]^10 + 4725*c[0]^8*mu[0]^2 + 3150*c[0]^6*mu[0]^4 + 630*c[0]^4*mu[0]^6 + 45*c[0]^2*mu[0]^8 + mu[0]^10)))/2)*w[0] + ((c[1]*mu[1]*(2895*c[1]^8 + 2640*c[1]^6*mu[1]^2 + 588*c[1]^4*mu[1]^4 + 44*c[1]^2*mu[1]^6 + mu[1]^8))/(E^(mu[1]^2/(2*c[1]^2))*Sqrt[2*Pi]) + ((1 + Erf[mu[1]/(Sqrt[2]*c[1])])*(945*c[1]^10 + 4725*c[1]^8*mu[1]^2 + 3150*c[1]^6*mu[1]^4 + 630*c[1]^4*mu[1]^6 + 45*c[1]^2*mu[1]^8 + mu[1]^10))/2 + (a^10*(-((Sqrt[2/Pi]*c[1]*mu[1]*(2895*c[1]^8 + 2640*c[1]^6*mu[1]^2 + 588*c[1]^4*mu[1]^4 + 44*c[1]^2*mu[1]^6 + mu[1]^8))/E^(mu[1]^2/(2*c[1]^2))) + Erfc[mu[1]/(Sqrt[2]*c[1])]*(945*c[1]^10 + 4725*c[1]^8*mu[1]^2 + 3150*c[1]^6*mu[1]^4 + 630*c[1]^4*mu[1]^6 + 45*c[1]^2*mu[1]^8 + mu[1]^10)))/2)*w[1]"
+# #These are the formulas for 2 components from mathematica
+# # ATTENTION: C IST STDDEVIATION, NOT VARIANCE!
+# m_raw = [None] * (number_of_moments + 1) #We need to add the zeroth moment for the loop
+# m_raw[0] = None #I dont use the zeroth moment!
+# m_raw[1] = r"(c[0]/(E^(mu[0]^2/(2*c[0]^2))*Sqrt[2*Pi]) - (a*c[0])/(E^(mu[0]^2/(2*c[0]^2))*Sqrt[2*Pi]) + ((1 + Erf[mu[0]/(Sqrt[2]*c[0])])*mu[0])/2 + (a*Erfc[mu[0]/(Sqrt[2]*c[0])]*mu[0])/2)*w[0] + (c[1]/(E^(mu[1]^2/(2*c[1]^2))*Sqrt[2*Pi]) - (a*c[1])/(E^(mu[1]^2/(2*c[1]^2))*Sqrt[2*Pi]) + ((1 + Erf[mu[1]/(Sqrt[2]*c[1])])*mu[1])/2 + (a*Erfc[mu[1]/(Sqrt[2]*c[1])]*mu[1])/2)*w[1]"
+# m_raw[2] = r"((c[0]*mu[0])/(E^(mu[0]^2/(2*c[0]^2))*Sqrt[2*Pi]) - (a^2*c[0]*mu[0])/(E^(mu[0]^2/(2*c[0]^2))*Sqrt[2*Pi]) + ((1 + Erf[mu[0]/(Sqrt[2]*c[0])])*(c[0]^2 + mu[0]^2))/2 + (a^2*Erfc[mu[0]/(Sqrt[2]*c[0])]*(c[0]^2 + mu[0]^2))/2)*w[0] + ((c[1]*mu[1])/(E^(mu[1]^2/(2*c[1]^2))*Sqrt[2*Pi]) - (a^2*c[1]*mu[1])/(E^(mu[1]^2/(2*c[1]^2))*Sqrt[2*Pi]) + ((1 + Erf[mu[1]/(Sqrt[2]*c[1])])*(c[1]^2 + mu[1]^2))/2 + (a^2*Erfc[mu[1]/(Sqrt[2]*c[1])]*(c[1]^2 + mu[1]^2))/2)*w[1]"
+# m_raw[3] = r"((c[0]*(2*c[0]^2 + mu[0]^2))/(E^(mu[0]^2/(2*c[0]^2))*Sqrt[2*Pi]) - (a^3*c[0]*(2*c[0]^2 + mu[0]^2))/(E^(mu[0]^2/(2*c[0]^2))*Sqrt[2*Pi]) + ((1 + Erf[mu[0]/(Sqrt[2]*c[0])])*mu[0]*(3*c[0]^2 + mu[0]^2))/2 + (a^3*Erfc[mu[0]/(Sqrt[2]*c[0])]*mu[0]*(3*c[0]^2 + mu[0]^2))/2)*w[0] + ((c[1]*(2*c[1]^2 + mu[1]^2))/(E^(mu[1]^2/(2*c[1]^2))*Sqrt[2*Pi]) - (a^3*c[1]*(2*c[1]^2 + mu[1]^2))/(E^(mu[1]^2/(2*c[1]^2))*Sqrt[2*Pi]) + ((1 + Erf[mu[1]/(Sqrt[2]*c[1])])*mu[1]*(3*c[1]^2 + mu[1]^2))/2 + (a^3*Erfc[mu[1]/(Sqrt[2]*c[1])]*mu[1]*(3*c[1]^2 + mu[1]^2))/2)*w[1]"
+# m_raw[4] = r"((c[0]*mu[0]*(5*c[0]^2 + mu[0]^2))/(E^(mu[0]^2/(2*c[0]^2))*Sqrt[2*Pi]) - (a^4*c[0]*mu[0]*(5*c[0]^2 + mu[0]^2))/(E^(mu[0]^2/(2*c[0]^2))*Sqrt[2*Pi]) + ((1 + Erf[mu[0]/(Sqrt[2]*c[0])])*(3*c[0]^4 + 6*c[0]^2*mu[0]^2 + mu[0]^4))/2 + (a^4*Erfc[mu[0]/(Sqrt[2]*c[0])]*(3*c[0]^4 + 6*c[0]^2*mu[0]^2 + mu[0]^4))/2)*w[0] + ((c[1]*mu[1]*(5*c[1]^2 + mu[1]^2))/(E^(mu[1]^2/(2*c[1]^2))*Sqrt[2*Pi]) - (a^4*c[1]*mu[1]*(5*c[1]^2 + mu[1]^2))/(E^(mu[1]^2/(2*c[1]^2))*Sqrt[2*Pi]) + ((1 + Erf[mu[1]/(Sqrt[2]*c[1])])*(3*c[1]^4 + 6*c[1]^2*mu[1]^2 + mu[1]^4))/2 + (a^4*Erfc[mu[1]/(Sqrt[2]*c[1])]*(3*c[1]^4 + 6*c[1]^2*mu[1]^2 + mu[1]^4))/2)*w[1]"
+# m_raw[5] = r"((c[0]*(c[0]^2 + mu[0]^2)*(8*c[0]^2 + mu[0]^2))/(E^(mu[0]^2/(2*c[0]^2))*Sqrt[2*Pi]) - (a^5*c[0]*(c[0]^2 + mu[0]^2)*(8*c[0]^2 + mu[0]^2))/(E^(mu[0]^2/(2*c[0]^2))*Sqrt[2*Pi]) + ((1 + Erf[mu[0]/(Sqrt[2]*c[0])])*mu[0]*(15*c[0]^4 + 10*c[0]^2*mu[0]^2 + mu[0]^4))/2 + (a^5*Erfc[mu[0]/(Sqrt[2]*c[0])]*mu[0]*(15*c[0]^4 + 10*c[0]^2*mu[0]^2 + mu[0]^4))/2)*w[0] + ((c[1]*(c[1]^2 + mu[1]^2)*(8*c[1]^2 + mu[1]^2))/(E^(mu[1]^2/(2*c[1]^2))*Sqrt[2*Pi]) - (a^5*c[1]*(c[1]^2 + mu[1]^2)*(8*c[1]^2 + mu[1]^2))/(E^(mu[1]^2/(2*c[1]^2))*Sqrt[2*Pi]) + ((1 + Erf[mu[1]/(Sqrt[2]*c[1])])*mu[1]*(15*c[1]^4 + 10*c[1]^2*mu[1]^2 + mu[1]^4))/2 + (a^5*Erfc[mu[1]/(Sqrt[2]*c[1])]*mu[1]*(15*c[1]^4 + 10*c[1]^2*mu[1]^2 + mu[1]^4))/2)*w[1]"
+# m_raw[6] = r"((c[0]*mu[0]*(33*c[0]^4 + 14*c[0]^2*mu[0]^2 + mu[0]^4))/(E^(mu[0]^2/(2*c[0]^2))*Sqrt[2*Pi]) - (a^6*c[0]*mu[0]*(33*c[0]^4 + 14*c[0]^2*mu[0]^2 + mu[0]^4))/(E^(mu[0]^2/(2*c[0]^2))*Sqrt[2*Pi]) + ((1 + Erf[mu[0]/(Sqrt[2]*c[0])])*(15*c[0]^6 + 45*c[0]^4*mu[0]^2 + 15*c[0]^2*mu[0]^4 + mu[0]^6))/2 + (a^6*Erfc[mu[0]/(Sqrt[2]*c[0])]*(15*c[0]^6 + 45*c[0]^4*mu[0]^2 + 15*c[0]^2*mu[0]^4 + mu[0]^6))/2)*w[0] + ((c[1]*mu[1]*(33*c[1]^4 + 14*c[1]^2*mu[1]^2 + mu[1]^4))/(E^(mu[1]^2/(2*c[1]^2))*Sqrt[2*Pi]) - (a^6*c[1]*mu[1]*(33*c[1]^4 + 14*c[1]^2*mu[1]^2 + mu[1]^4))/(E^(mu[1]^2/(2*c[1]^2))*Sqrt[2*Pi]) + ((1 + Erf[mu[1]/(Sqrt[2]*c[1])])*(15*c[1]^6 + 45*c[1]^4*mu[1]^2 + 15*c[1]^2*mu[1]^4 + mu[1]^6))/2 + (a^6*Erfc[mu[1]/(Sqrt[2]*c[1])]*(15*c[1]^6 + 45*c[1]^4*mu[1]^2 + 15*c[1]^2*mu[1]^4 + mu[1]^6))/2)*w[1]"
+# m_raw[7] = r"((c[0]*(48*c[0]^6 + 87*c[0]^4*mu[0]^2 + 20*c[0]^2*mu[0]^4 + mu[0]^6))/(E^(mu[0]^2/(2*c[0]^2))*Sqrt[2*Pi]) - (a^7*c[0]*(48*c[0]^6 + 87*c[0]^4*mu[0]^2 + 20*c[0]^2*mu[0]^4 + mu[0]^6))/(E^(mu[0]^2/(2*c[0]^2))*Sqrt[2*Pi]) + ((1 + Erf[mu[0]/(Sqrt[2]*c[0])])*mu[0]*(105*c[0]^6 + 105*c[0]^4*mu[0]^2 + 21*c[0]^2*mu[0]^4 + mu[0]^6))/2 + (a^7*Erfc[mu[0]/(Sqrt[2]*c[0])]*mu[0]*(105*c[0]^6 + 105*c[0]^4*mu[0]^2 + 21*c[0]^2*mu[0]^4 + mu[0]^6))/2)*w[0] + ((c[1]*(48*c[1]^6 + 87*c[1]^4*mu[1]^2 + 20*c[1]^2*mu[1]^4 + mu[1]^6))/(E^(mu[1]^2/(2*c[1]^2))*Sqrt[2*Pi]) - (a^7*c[1]*(48*c[1]^6 + 87*c[1]^4*mu[1]^2 + 20*c[1]^2*mu[1]^4 + mu[1]^6))/(E^(mu[1]^2/(2*c[1]^2))*Sqrt[2*Pi]) + ((1 + Erf[mu[1]/(Sqrt[2]*c[1])])*mu[1]*(105*c[1]^6 + 105*c[1]^4*mu[1]^2 + 21*c[1]^2*mu[1]^4 + mu[1]^6))/2 + (a^7*Erfc[mu[1]/(Sqrt[2]*c[1])]*mu[1]*(105*c[1]^6 + 105*c[1]^4*mu[1]^2 + 21*c[1]^2*mu[1]^4 + mu[1]^6))/2)*w[1]"
+# m_raw[8] = r"((c[0]*mu[0]*(279*c[0]^6 + 185*c[0]^4*mu[0]^2 + 27*c[0]^2*mu[0]^4 + mu[0]^6))/(E^(mu[0]^2/(2*c[0]^2))*Sqrt[2*Pi]) - (a^8*c[0]*mu[0]*(279*c[0]^6 + 185*c[0]^4*mu[0]^2 + 27*c[0]^2*mu[0]^4 + mu[0]^6))/(E^(mu[0]^2/(2*c[0]^2))*Sqrt[2*Pi]) + ((1 + Erf[mu[0]/(Sqrt[2]*c[0])])*(105*c[0]^8 + 420*c[0]^6*mu[0]^2 + 210*c[0]^4*mu[0]^4 + 28*c[0]^2*mu[0]^6 + mu[0]^8))/2 + (a^8*Erfc[mu[0]/(Sqrt[2]*c[0])]*(105*c[0]^8 + 420*c[0]^6*mu[0]^2 + 210*c[0]^4*mu[0]^4 + 28*c[0]^2*mu[0]^6 + mu[0]^8))/2)*w[0] + ((c[1]*mu[1]*(279*c[1]^6 + 185*c[1]^4*mu[1]^2 + 27*c[1]^2*mu[1]^4 + mu[1]^6))/(E^(mu[1]^2/(2*c[1]^2))*Sqrt[2*Pi]) - (a^8*c[1]*mu[1]*(279*c[1]^6 + 185*c[1]^4*mu[1]^2 + 27*c[1]^2*mu[1]^4 + mu[1]^6))/(E^(mu[1]^2/(2*c[1]^2))*Sqrt[2*Pi]) + ((1 + Erf[mu[1]/(Sqrt[2]*c[1])])*(105*c[1]^8 + 420*c[1]^6*mu[1]^2 + 210*c[1]^4*mu[1]^4 + 28*c[1]^2*mu[1]^6 + mu[1]^8))/2 + (a^8*Erfc[mu[1]/(Sqrt[2]*c[1])]*(105*c[1]^8 + 420*c[1]^6*mu[1]^2 + 210*c[1]^4*mu[1]^4 + 28*c[1]^2*mu[1]^6 + mu[1]^8))/2)*w[1]"
+# m_raw[9] = r"(-((a^9*c[0]*(384*c[0]^8 + 975*c[0]^6*mu[0]^2 + 345*c[0]^4*mu[0]^4 + 35*c[0]^2*mu[0]^6 + mu[0]^8))/(E^(mu[0]^2/(2*c[0]^2))*Sqrt[2*Pi])) + (a^9*Erfc[mu[0]/(Sqrt[2]*c[0])]*mu[0]*(945*c[0]^8 + 1260*c[0]^6*mu[0]^2 + 378*c[0]^4*mu[0]^4 + 36*c[0]^2*mu[0]^6 + mu[0]^8))/2 + (945*c[0]^8*mu[0] + 1260*c[0]^6*mu[0]^3 + 378*c[0]^4*mu[0]^5 + 36*c[0]^2*mu[0]^7 + mu[0]^9 + (Sqrt[2/Pi]*c[0]*(384*c[0]^8 + 975*c[0]^6*mu[0]^2 + 345*c[0]^4*mu[0]^4 + 35*c[0]^2*mu[0]^6 + mu[0]^8))/E^(mu[0]^2/(2*c[0]^2)) + Erf[mu[0]/(Sqrt[2]*c[0])]*(945*c[0]^8*mu[0] + 1260*c[0]^6*mu[0]^3 + 378*c[0]^4*mu[0]^5 + 36*c[0]^2*mu[0]^7 + mu[0]^9))/2)*w[0] + (-((a^9*c[1]*(384*c[1]^8 + 975*c[1]^6*mu[1]^2 + 345*c[1]^4*mu[1]^4 + 35*c[1]^2*mu[1]^6 + mu[1]^8))/(E^(mu[1]^2/(2*c[1]^2))*Sqrt[2*Pi])) + (a^9*Erfc[mu[1]/(Sqrt[2]*c[1])]*mu[1]*(945*c[1]^8 + 1260*c[1]^6*mu[1]^2 + 378*c[1]^4*mu[1]^4 + 36*c[1]^2*mu[1]^6 + mu[1]^8))/2 + (945*c[1]^8*mu[1] + 1260*c[1]^6*mu[1]^3 + 378*c[1]^4*mu[1]^5 + 36*c[1]^2*mu[1]^7 + mu[1]^9 + (Sqrt[2/Pi]*c[1]*(384*c[1]^8 + 975*c[1]^6*mu[1]^2 + 345*c[1]^4*mu[1]^4 + 35*c[1]^2*mu[1]^6 + mu[1]^8))/E^(mu[1]^2/(2*c[1]^2)) + Erf[mu[1]/(Sqrt[2]*c[1])]*(945*c[1]^8*mu[1] + 1260*c[1]^6*mu[1]^3 + 378*c[1]^4*mu[1]^5 + 36*c[1]^2*mu[1]^7 + mu[1]^9))/2)*w[1]"
+# m_raw[10]= r"((c[0]*mu[0]*(2895*c[0]^8 + 2640*c[0]^6*mu[0]^2 + 588*c[0]^4*mu[0]^4 + 44*c[0]^2*mu[0]^6 + mu[0]^8))/(E^(mu[0]^2/(2*c[0]^2))*Sqrt[2*Pi]) + ((1 + Erf[mu[0]/(Sqrt[2]*c[0])])*(945*c[0]^10 + 4725*c[0]^8*mu[0]^2 + 3150*c[0]^6*mu[0]^4 + 630*c[0]^4*mu[0]^6 + 45*c[0]^2*mu[0]^8 + mu[0]^10))/2 + (a^10*(-((Sqrt[2/Pi]*c[0]*mu[0]*(2895*c[0]^8 + 2640*c[0]^6*mu[0]^2 + 588*c[0]^4*mu[0]^4 + 44*c[0]^2*mu[0]^6 + mu[0]^8))/E^(mu[0]^2/(2*c[0]^2))) + Erfc[mu[0]/(Sqrt[2]*c[0])]*(945*c[0]^10 + 4725*c[0]^8*mu[0]^2 + 3150*c[0]^6*mu[0]^4 + 630*c[0]^4*mu[0]^6 + 45*c[0]^2*mu[0]^8 + mu[0]^10)))/2)*w[0] + ((c[1]*mu[1]*(2895*c[1]^8 + 2640*c[1]^6*mu[1]^2 + 588*c[1]^4*mu[1]^4 + 44*c[1]^2*mu[1]^6 + mu[1]^8))/(E^(mu[1]^2/(2*c[1]^2))*Sqrt[2*Pi]) + ((1 + Erf[mu[1]/(Sqrt[2]*c[1])])*(945*c[1]^10 + 4725*c[1]^8*mu[1]^2 + 3150*c[1]^6*mu[1]^4 + 630*c[1]^4*mu[1]^6 + 45*c[1]^2*mu[1]^8 + mu[1]^10))/2 + (a^10*(-((Sqrt[2/Pi]*c[1]*mu[1]*(2895*c[1]^8 + 2640*c[1]^6*mu[1]^2 + 588*c[1]^4*mu[1]^4 + 44*c[1]^2*mu[1]^6 + mu[1]^8))/E^(mu[1]^2/(2*c[1]^2))) + Erfc[mu[1]/(Sqrt[2]*c[1])]*(945*c[1]^10 + 4725*c[1]^8*mu[1]^2 + 3150*c[1]^6*mu[1]^4 + 630*c[1]^4*mu[1]^6 + 45*c[1]^2*mu[1]^8 + mu[1]^10)))/2)*w[1]"
 
-# Turn Mathematica expressions into usable python expressions
-m = [None] *(number_of_moments)
+# # Turn Mathematica expressions into usable python expressions
+# m = [None] *(number_of_moments)
 
-for i,m in enumerate(m_raw):
-    if i == 0:
-        continue
-    # Replace \[Pi] with Pi in the expressions so python can read it
-    m_raw[i] = replace_pi(m_raw[i])
-    # Replace mu[i] with mui when i is a variable integer
-    m_raw[i] = replace_mu_index(m_raw[i])
-    # Replace w[i] with wi when i is a variable integer
-    m_raw[i] = replace_w_index(m_raw[i])
-    # Replace c[i] with ci when i is a variable integer
-    m_raw[i] = replace_c_index(m_raw[i])
+# for i,m in enumerate(m_raw):
+#     if i == 0:
+#         continue
+#     # Replace \[Pi] with Pi in the expressions so python can read it
+#     m_raw[i] = replace_pi(m_raw[i])
+#     # Replace mu[i] with mui when i is a variable integer
+#     m_raw[i] = replace_mu_index(m_raw[i])
+#     # Replace w[i] with wi when i is a variable integer
+#     m_raw[i] = replace_w_index(m_raw[i])
+#     # Replace c[i] with ci when i is a variable integer
+#     m_raw[i] = replace_c_index(m_raw[i])
 
-#Parse every expression for translation
-mp = []
-for mx in m_raw:
-    if mx is None:
-        continue
-    mp.append(parse_mathematica(mx)) 
+# #Parse every expression for translation
+# mp = []
+# for mx in m_raw:
+#     if mx is None:
+#         continue
+#     mp.append(parse_mathematica(mx)) 
 
-#Replace the function expressions with handles
-for i, mx in enumerate(mp):
-    mp[i] = mx.replace(
-        lambda x: x.func.__name__ == 'Erf',
-        lambda x: erf(x.args[0])
-    ).replace(
-        lambda x: x.func.__name__ == 'Erfc',
-        lambda x: erfc(x.args[0])
-    )   
+# #Replace the function expressions with handles
+# for i, mx in enumerate(mp):
+#     mp[i] = mx.replace(
+#         lambda x: x.func.__name__ == 'Erf',
+#         lambda x: erf(x.args[0])
+#     ).replace(
+#         lambda x: x.func.__name__ == 'Erfc',
+#         lambda x: erfc(x.args[0])
+#     )   
 
-print("Parsed Mathematica expressions:")
-for i, mx in enumerate(mp):
-    print(f"m[{i}] = {mx}")
-print("")
+# print("Parsed Mathematica expressions:")
+# for i, mx in enumerate(mp):
+#     print(f"m[{i}] = {mx}")
+# print("")
 
-def compute_moments_analytic(a_test, c0_test, c1_test, mu0_test, mu1_test, w0_test, w1_test):
-    """
-    Compute the moments for a two component Gaussian Mixture analytically using the provided parameters.
-    c is the covariance, will be replaced with stddev in the function itself
-    """
-    # Substitute Values (Take care for variance and stddev)
-    values = {a: a_test, c0: np.sqrt(c0_test), c1:np.sqrt(c1_test), mu0: mu0_test, mu1:mu1_test, w0: w0_test, w1: w1_test}
-    moments_analytic = []
-    for i, mx in enumerate(mp):
-        evaluated_expr = mx.subs(values)
-        # Numerically evaluate the result
-        result = evaluated_expr.evalf()
-        moments_analytic.append(result)
-    return moments_analytic
+# def compute_moments_analytic(a_test, c0_test, c1_test, mu0_test, mu1_test, w0_test, w1_test):
+#     """
+#     Compute the moments for a two component Gaussian Mixture analytically using the provided parameters.
+#     c is the covariance, will be replaced with stddev in the function itself
+#     """
+#     # Substitute Values (Take care for variance and stddev)
+#     values = {a: a_test, c0: np.sqrt(c0_test), c1:np.sqrt(c1_test), mu0: mu0_test, mu1:mu1_test, w0: w0_test, w1: w1_test}
+#     moments_analytic = []
+#     for i, mx in enumerate(mp):
+#         evaluated_expr = mx.subs(values)
+#         # Numerically evaluate the result
+#         result = evaluated_expr.evalf()
+#         moments_analytic.append(result)
+#     return moments_analytic
 
 def fit_gm_moments(params,args):
     """
@@ -637,10 +766,10 @@ class GaussianMixtureNetwork():
         for i in range(len(self.layers)-1):
             if self.activations[i] == 'relu':
                 self.activation_functions.append(self.relu)
-            if self.activations[i] == 'linear':
+            elif self.activations[i] == 'linear':
                 self.activation_functions.append(self.linear)
             else:
-                raise ValueError(f"Unsupported activation function: {self.activations[i]}")
+                raise ValueError(f"Unsupported activation function: {self.activations[i]} but should be {'relu'}")
             
     def relu(self, x, return_name=False):
         """General ReLU activation function with leaky parameter"""
@@ -656,7 +785,16 @@ class GaussianMixtureNetwork():
         return x
 
     def print_network(self):
-        pass
+        """
+        Print out the network structure with activation functions.
+        """
+        print("Gaussian Mixture Network Structure:")
+        for i in range(len(self.layers) - 1):
+            act = self.activations[i] if i < len(self.activations) else "none"
+            print(f" Layer {i}: {self.layers[i]} -> {self.layers[i+1]} neurons | Activation: {act}")
+        print(f" Pre-activation GM components: {self.components_pre}")
+        print(f" Post-activation GM components: {self.components_post}")
+        print(f" Leaky ReLU slope (a): {self.a_relu}")
 
     def forward_moments(self,x):
         """
@@ -666,19 +804,75 @@ class GaussianMixtureNetwork():
 
         assert len(x) == self.layers[0], f"Input data must have {self.layers[0]} features, but got {len(x)}"
 
-        # Indexing a GM Parameter value is done by [layer][neuron][component]
+        # Augment Bias 
+        x = np.concatenate((x, np.ones((1, x.shape[1]))), axis=0)
+
+        # Indexing a GM Parameter value is done by [layer][neuron,component]
 
         ######
         # Handle the first layer seperately as it uses deterministic input
         ######
-        # Match Pre-Activation
+        # Note: I assume that thr first ectivation is ReLU
+        # Iterate over the neurons in the first layer
+        for i in range(self.layers[0]):
+            # Match Pre-Activation
+            # Compute moments of the pre activation (Weights for one neuron are one column of the weight matrix)
+            moments_pre = moments_pre_act_combined_det(x, np.concatenate((self.weight_means[0][:,i], self.weight_variances[0][:,i])))
 
-        # Match Post-Activation
+            # Match the GM parameters to the moments
+            means, variances, weights = match_moments_2(moments_pre, components = 2)
 
+            self.means_gm_pre[0][i,:] = means
+            self.variances_gm_pre[0][i,:] = variances
+            self.weights_gm_pre[0][i,:] = weights
+
+            # Match Post-Activation
+            # Compute moments of the post activation
+            moments_post =  moments_post_act(self.a_relu, means, variances, weights)
+
+            # Match the GM parameters to the moments
+            means, variances, weights = match_moments_2(moments_post, components = 2)
+            self.means_gm_post[0][i,:] = means
+            self.variances_gm_post[0][i,:] = variances
+            self.weights_gm_post[0][i,:] = weights
 
         ######
         # Iterate over the rest of the layers
+        # I need to handle the bias term seperately as it is (Gauss x Deterministic)
         ######
-        # Match Pre-Activation
+        for l in range(1, len(self.layers)-1):
+            # Iterate over the neurons in the next layer
+            for i in range(self.layers[0]):
+                # Match Pre-Activation
+                # Compute moments of the pre activation. This takes the weights as Gaussians and the previous layer output as GM, except for the bias neuron
+                # Augment the Bias neuron and assemble the parameter list
+                z_complete = np.concatenate((self.means_gm_post[l-1][i,:],self.variances_gm_post[l-1][i,:],self.weights_gm_post[l-1][i,:]))
+                z_complete = np.concatenate((z_complete, np.zeros((self.components_post,1))), axis=0)
+                z_complete[-1,0] = 1 # Bias as fictive GM component with mean 1
+                moments_pre = moments_pre_act_combined(np.concatenate((self.weight_means[l][:,i], self.weight_variances[l][:,i])), z_complete)
 
-        # Match Post-Activation
+                # Match the GM parameters to the moments
+                means, variances, weights = match_moments_2(moments_pre, components = 2)
+
+                self.means_gm_pre[l][i,:] = means
+                self.variances_gm_pre[l][i,:] = variances
+                self.weights_gm_pre[l][i,:] = weights
+
+                # Match Post-Activation
+                if self.activations[l] == 'relu':
+                    # Compute moments of the post activation
+                    moments_post =  moments_post_act(self.a_relu, means, variances, weights)
+
+                    # Match the GM parameters to the moments
+                    means, variances, weights = match_moments_2(moments_post, components = 2)
+                    self.means_gm_post[l][i,:] = means
+                    self.variances_gm_post[l][i,:] = variances
+                    self.weights_gm_post[l][i,:] = weights
+                    
+                elif self.activations[l] == 'linear':
+                    moments_post = moments_pre
+                    self.means_gm_post[l][i,:] = means
+                    self.variances_gm_post[l][i,:] = variances
+                    self.weights_gm_post[l][i,:] = weights
+
+        return self.means_gm_post[-1], self.variances_gm_post[-1], self.weights_gm_post[-1]
