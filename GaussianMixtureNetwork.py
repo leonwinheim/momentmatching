@@ -1,46 +1,11 @@
-###########################################################################
-# Collect some functions to be shared in the GM BNN Project
-# Author: Leon Winheim
-# Date: 02.05.2025
-###########################################################################
+#######################################################################################
+# Utilities for Gaussian Mixture Network model 
+# Author: Leon Winheim, ISAS at KIT Karlsruhe
+# Date: 19.05.2025
+#######################################################################################
 import numpy as np
-from sympy.parsing.mathematica import parse_mathematica
-from sympy import var, erf, erfc
-import sklearn
-import re
+from scipy.special import erf, erfc
 from scipy.optimize import least_squares, minimize
-
-# Replace \[Pi] with Pi in the expressions so python can read it
-def replace_pi(expression):
-    if expression is None:
-        return expression
-    return expression.replace("\\[Pi]", "Pi")
-
-# Replace mu[i] with mui when i is a variable integer
-def replace_mu_index(expression):
-    if expression is None:
-        return expression
-    # Use regex to find patterns like mu[i] where i is an integer
-    pattern = r"mu\[(\d+)\]"
-    # Replace mu[i] with mui
-    return re.sub(pattern, lambda match: f"mu{match.group(1)}", expression)
-
-# Replace w[i] with wi when i is a variable integer
-def replace_w_index(expression):
-    if expression is None:
-        return expression
-    # Use regex to find patterns like w[i] where i is an integer
-    pattern = r"w\[(\d+)\]"
-    # Replace w[i] with wi
-    return re.sub(pattern, lambda match: f"w{match.group(1)}", expression)
-
-def replace_c_index(expression):
-    if expression is None:
-        return expression
-    # Use regex to find patterns like c[i] where i is an integer
-    pattern = r"c\[(\d+)\]"
-    # Replace c[i] with ci
-    return re.sub(pattern, lambda match: f"c{match.group(1)}", expression)
 
 # Noncentral moments of a Gaussian, parametrized with the covariance
 def  e1(mu):
@@ -205,67 +170,6 @@ def e20_gm(w: np.array, mu: np.array, c: np.array):
         e20_gm += w[i] * e20(mu[i], c[i])
     return e20_gm
 
-# Noncentral moments of a Gaussian Mixture with two components
-def e1_gm2(w0_v, w1_v, mu0_v, mu1_v, c0_v, c1_v):
-    return (w0_v * e1(mu0_v) + w1_v * e1(mu1_v))
-
-def e2_gm2(w0_v, w1_v, mu0_v, mu1_v, c0_v, c1_v):
-    return (w0_v * e2(mu0_v, c0_v) + w1_v * e2(mu1_v, c1_v))
-
-def e3_gm2(w0_v, w1_v, mu0_v, mu1_v, c0_v, c1_v):
-    return (w0_v * e3(mu0_v, c0_v) + w1_v * e3(mu1_v, c1_v))
-
-def e4_gm2(w0_v, w1_v, mu0_v, mu1_v, c0_v, c1_v):
-    return (w0_v * e4(mu0_v, c0_v) + w1_v * e4(mu1_v, c1_v))
-
-def e5_gm2(w0_v, w1_v, mu0_v, mu1_v, c0_v, c1_v):
-    return (w0_v * e5(mu0_v, c0_v) + w1_v * e5(mu1_v, c1_v))
-
-def e6_gm2(w0_v, w1_v, mu0_v, mu1_v, c0_v, c1_v):
-    return (w0_v * e6(mu0_v, c0_v) + w1_v * e6(mu1_v, c1_v))
-
-def e7_gm2(w0_v, w1_v, mu0_v, mu1_v, c0_v, c1_v):
-    return (w0_v * e7(mu0_v, c0_v) + w1_v * e7(mu1_v, c1_v))
-
-def e8_gm2(w0_v, w1_v, mu0_v, mu1_v, c0_v, c1_v):
-    return (w0_v * e8(mu0_v, c0_v) + w1_v * e8(mu1_v, c1_v))
-
-def e9_gm2(w0_v, w1_v, mu0_v, mu1_v, c0_v, c1_v):
-    return (w0_v * e9(mu0_v, c0_v) + w1_v * e9(mu1_v, c1_v))
-
-def e10_gm2(w0_v, w1_v, mu0_v, mu1_v, c0_v, c1_v):
-    return (w0_v * e10(mu0_v, c0_v) + w1_v * e10(mu1_v, c1_v))
-
-def e11_gm2(w0_v, w1_v, mu0_v, mu1_v, c0_v, c1_v):
-    return (w0_v * e11(mu0_v, c0_v) + w1_v * e11(mu1_v, c1_v))
-
-def e12_gm2(w0_v, w1_v, mu0_v, mu1_v, c0_v, c1_v):
-    return (w0_v * e12(mu0_v, c0_v) + w1_v * e12(mu1_v, c1_v))
-
-def e13_gm2(w0_v, w1_v, mu0_v, mu1_v, c0_v, c1_v):
-    return (w0_v * e13(mu0_v, c0_v) + w1_v * e13(mu1_v, c1_v))
-
-def e14_gm2(w0_v, w1_v, mu0_v, mu1_v, c0_v, c1_v):
-    return (w0_v * e14(mu0_v, c0_v) + w1_v * e14(mu1_v, c1_v))
-
-def e15_gm2(w0_v, w1_v, mu0_v, mu1_v, c0_v, c1_v):
-    return (w0_v * e15(mu0_v, c0_v) + w1_v * e15(mu1_v, c1_v))
-
-def e16_gm2(w0_v, w1_v, mu0_v, mu1_v, c0_v, c1_v):
-    return (w0_v * e16(mu0_v, c0_v) + w1_v * e16(mu1_v, c1_v))
-
-def e17_gm2(w0_v, w1_v, mu0_v, mu1_v, c0_v, c1_v):
-    return (w0_v * e17(mu0_v, c0_v) + w1_v * e17(mu1_v, c1_v))
-
-def e18_gm2(w0_v, w1_v, mu0_v, mu1_v, c0_v, c1_v):
-    return (w0_v * e18(mu0_v, c0_v) + w1_v * e18(mu1_v, c1_v))
-
-def e19_gm2(w0_v, w1_v, mu0_v, mu1_v, c0_v, c1_v):
-    return (w0_v * e19(mu0_v, c0_v) + w1_v * e19(mu1_v, c1_v))
-
-def e20_gm2(w0_v, w1_v, mu0_v, mu1_v, c0_v, c1_v):
-    return (w0_v * e20(mu0_v, c0_v) + w1_v * e20(mu1_v, c1_v))
-
 # Next generation of functions
 def moments_pre_act_single_det(x,mu_w,c_w):
     """This function computes the first ten moments of the random variable product w*x, 
@@ -295,7 +199,6 @@ def moments_pre_act_single_det(x,mu_w,c_w):
     result[9] = x**10*e10(mu_w,c_w)  #Tenth Moment
 
     return result
-
 
 def moments_pre_act_combined_det(x_list,w_list):
     """ This function computes the first ten moments of the pre activation value for a single neuron with multiple products input and weight.
@@ -435,70 +338,6 @@ def moments_post_act(a:float,mu:np.ndarray,c:np.ndarray,w:np.ndarray):
         
     return result
 
-def residuals_matching(params, t):
-    """Compute the residual value for the optimization process."""
-    # Infer how many components we have
-    components = int(len(params)/3)
-    # Extract the parameters from the input vector
-    w = params[:components]
-    mu = params[components:components*2]
-    c = params[components*2:components*3]
-
-    # Compute the moments of the Gaussian Mixture
-    gm_moments = np.zeros(10, dtype=float)
-    gm_moments[0] = e1_gm(w, mu, c)
-    gm_moments[1] = e2_gm(w, mu, c)
-    gm_moments[2] = e3_gm(w, mu, c)
-    gm_moments[3] = e4_gm(w, mu, c)
-    gm_moments[4] = e5_gm(w, mu, c)
-    gm_moments[5] = e6_gm(w, mu, c)
-    gm_moments[6] = e7_gm(w, mu, c)
-    gm_moments[7] = e8_gm(w, mu, c)
-    gm_moments[8] = e9_gm(w, mu, c)
-    gm_moments[9] = e10_gm(w, mu, c)
-
-    # Compute the weighted residuals
-    residuals = np.zeros(10, dtype=float)
-    for i in range(10):
-        residuals[i] = abs(gm_moments[i] - t[i])/t[i]
-
-    # This should return a scalar value
-    return residuals
-
-def residual_sum_matching(params, t):
-    """Compute the residual value for the optimization process."""
-    # Infer how many components we have
-    components = int(len(params)/3)
-    # Extract the parameters from the input vector
-    w = params[:components]
-    mu = params[components:components*2]
-    c = params[components*2:components*3]
-
-    # Compute the moments of the Gaussian Mixture
-    gm_moments = np.zeros(10, dtype=float)
-    gm_moments[0] = e1_gm(w, mu, c)
-    gm_moments[1] = e2_gm(w, mu, c)
-    gm_moments[2] = e3_gm(w, mu, c)
-    gm_moments[3] = e4_gm(w, mu, c)
-    gm_moments[4] = e5_gm(w, mu, c)
-    gm_moments[5] = e6_gm(w, mu, c)
-    gm_moments[6] = e7_gm(w, mu, c)
-    gm_moments[7] = e8_gm(w, mu, c)
-    gm_moments[8] = e9_gm(w, mu, c)
-    gm_moments[9] = e10_gm(w, mu, c)
-
-    # Compute the weighted residuals
-    residuals = np.zeros(10, dtype=float)
-    for i in range(10):
-        residuals[i] = abs(gm_moments[i] - t[i])/t[i]
-    
-    # Compute the sum of the residuals
-    residual_sum = np.sum(residuals)
-
-    # This should return a scalar value
-    return residual_sum
-
-
 def match_moments(in_mom,components):
     """Function to perform the moment matching for given Moments and a desired number of components."""
 
@@ -544,137 +383,80 @@ def match_moments_2(in_mom, components):
     params = [0.5,0.0,1.0,1.0,1.0]  # Initial guess for [w0, mu0, mu1, c0, c1]
 
     # Call optimizer with bounds
-    result = least_squares(residuals_weighted, params, args=in_mom, bounds=([0, -np.inf, -np.inf, 0, 0], [1.0, np.inf, np.inf, np.inf, np.inf]))
+    result = least_squares(residuals_matching, params, args=in_mom, bounds=([0, -np.inf, -np.inf, 0, 0], [1.0, np.inf, np.inf, np.inf, np.inf]))
 
     w_res = [result.x[0], 1 - result.x[0]]
     mu_res = [result.x[1], result.x[2]]
     c_res = [result.x[3], result.x[4]]
 
-    return mu_res, c_res, w_res
+    return np.array(mu_res), np.array(c_res), np.array(w_res)
 
+def residual_sum_matching(params, t):
+    """Compute the residual value for the optimization process."""
+    # Infer how many components we have
+    components = int(len(params)/3)
+    # Extract the parameters from the input vector
+    w = params[:components]
+    mu = params[components:components*2]
+    c = params[components*2:components*3]
 
-# Function to compute the residuals for optimization
-def residuals(params, t1, t2, t3, t4, t5, t6, t7, t8, t9, t10):
-    w0_v, mu0_v, mu1_v, c0_v, c1_v = params
-    w1_v = 1 - w0_v    #Attention! For more components we need to enforce the weights will be 1 in sum differently
-    r = np.array([
-        e1_gm2(w0_v,w1_v,mu0_v,mu1_v,c0_v,c1_v) - t1,
-        e2_gm2(w0_v,w1_v,mu0_v,mu1_v,c0_v,c1_v) - t2,
-        e3_gm2(w0_v,w1_v,mu0_v,mu1_v,c0_v,c1_v) - t3,
-        e4_gm2(w0_v,w1_v,mu0_v,mu1_v,c0_v,c1_v) - t4,
-        e5_gm2(w0_v,w1_v,mu0_v,mu1_v,c0_v,c1_v) - t5,
-        e6_gm2(w0_v,w1_v,mu0_v,mu1_v,c0_v,c1_v) - t6,
-        e7_gm2(w0_v,w1_v,mu0_v,mu1_v,c0_v,c1_v) - t7,
-        e8_gm2(w0_v,w1_v,mu0_v,mu1_v,c0_v,c1_v) - t8,
-        e9_gm2(w0_v,w1_v,mu0_v,mu1_v,c0_v,c1_v) - t9,
-        e10_gm2(w0_v,w1_v,mu0_v,mu1_v,c0_v,c1_v) - t10
-    ], dtype=float)
+    # Compute the moments of the Gaussian Mixture
+    gm_moments = np.zeros(10, dtype=float)
+    gm_moments[0] = e1_gm(w, mu, c)
+    gm_moments[1] = e2_gm(w, mu, c)
+    gm_moments[2] = e3_gm(w, mu, c)
+    gm_moments[3] = e4_gm(w, mu, c)
+    gm_moments[4] = e5_gm(w, mu, c)
+    gm_moments[5] = e6_gm(w, mu, c)
+    gm_moments[6] = e7_gm(w, mu, c)
+    gm_moments[7] = e8_gm(w, mu, c)
+    gm_moments[8] = e9_gm(w, mu, c)
+    gm_moments[9] = e10_gm(w, mu, c)
 
-    return r
+    # Compute the weighted residuals
+    residuals = np.zeros(10, dtype=float)
+    for i in range(10):
+        residuals[i] = abs(gm_moments[i] - t[i])/t[i]
+    
+    # Compute the sum of the residuals
+    residual_sum = np.sum(residuals)
 
-# Function to compute the residuals for optimization
-def residuals_weighted(params, t1, t2, t3, t4, t5, t6, t7, t8, t9, t10):
-    w0_v, mu0_v, mu1_v, c0_v, c1_v = params
-    w1_v = 1 - w0_v    #Attention! For more components we need to enforce the weights will be 1 in sum differently
-    r = np.array([
-        abs((e1_gm2(w0_v,w1_v,mu0_v,mu1_v,c0_v,c1_v) - t1) / t1),
-        abs((e2_gm2(w0_v,w1_v,mu0_v,mu1_v,c0_v,c1_v) - t2) / t2),
-        abs((e3_gm2(w0_v,w1_v,mu0_v,mu1_v,c0_v,c1_v) - t3) / t3),
-        abs((e4_gm2(w0_v,w1_v,mu0_v,mu1_v,c0_v,c1_v) - t4) / t4),
-        abs((e5_gm2(w0_v,w1_v,mu0_v,mu1_v,c0_v,c1_v) - t5) / t5),
-        abs((e6_gm2(w0_v,w1_v,mu0_v,mu1_v,c0_v,c1_v) - t6) / t6),
-        abs((e7_gm2(w0_v,w1_v,mu0_v,mu1_v,c0_v,c1_v) - t7) / t7),
-        abs((e8_gm2(w0_v,w1_v,mu0_v,mu1_v,c0_v,c1_v) - t8) / t8),
-        abs((e9_gm2(w0_v,w1_v,mu0_v,mu1_v,c0_v,c1_v) - t9) / t9),
-        abs((e10_gm2(w0_v,w1_v,mu0_v,mu1_v,c0_v,c1_v) - t10) / t10)
-    ], dtype=float)
+    # This should return a scalar value
+    return residual_sum
 
-    return r
+def residuals_matching(params, *args):
+    """Compute the residual value for the optimization process."""
+    t = []
+    for temp in args:
+        t.append(temp)
 
-# #******Store some stuff for two components and max order of 10******
-# # Define the symbolic variables (exclude erf and erfc here)
-# # a is the slope of the leaky part or the ReLU, c is the variance of the Gaussians, mu are the means of the GLM, w are the weights of the GLM
-# a, c0, c1, mu0, mu1, w0 ,w1 = var('a c0 c1 mu0 mu1 w0 w1')
+    # Infer how many components we have
+    components = int(len(params)/3)
+    # Extract the parameters from the input vector
+    w = params[:components]
+    mu = params[components:components*2]
+    c = params[components*2:components*3]
 
-# # Gaussian Mixture Moments through leaky relu.Expression from mathematica (\[]-Style expressions need to be replaced without brackets)
+    # Compute the moments of the Gaussian Mixture
+    gm_moments = np.zeros(10, dtype=float)
+    gm_moments[0] = e1_gm(w, mu, c)
+    gm_moments[1] = e2_gm(w, mu, c)
+    gm_moments[2] = e3_gm(w, mu, c)
+    gm_moments[3] = e4_gm(w, mu, c)
+    gm_moments[4] = e5_gm(w, mu, c)
+    gm_moments[5] = e6_gm(w, mu, c)
+    gm_moments[6] = e7_gm(w, mu, c)
+    gm_moments[7] = e8_gm(w, mu, c)
+    gm_moments[8] = e9_gm(w, mu, c)
+    gm_moments[9] = e10_gm(w, mu, c)
 
-# number_of_moments = 10
+    # Compute the weighted residuals
+    residuals = np.zeros(10, dtype=float)
+    for i in range(10):
+        residuals[i] = abs(gm_moments[i] - t[i])/t[i]
 
-# #These are the formulas for 2 components from mathematica
-# # ATTENTION: C IST STDDEVIATION, NOT VARIANCE!
-# m_raw = [None] * (number_of_moments + 1) #We need to add the zeroth moment for the loop
-# m_raw[0] = None #I dont use the zeroth moment!
-# m_raw[1] = r"(c[0]/(E^(mu[0]^2/(2*c[0]^2))*Sqrt[2*Pi]) - (a*c[0])/(E^(mu[0]^2/(2*c[0]^2))*Sqrt[2*Pi]) + ((1 + Erf[mu[0]/(Sqrt[2]*c[0])])*mu[0])/2 + (a*Erfc[mu[0]/(Sqrt[2]*c[0])]*mu[0])/2)*w[0] + (c[1]/(E^(mu[1]^2/(2*c[1]^2))*Sqrt[2*Pi]) - (a*c[1])/(E^(mu[1]^2/(2*c[1]^2))*Sqrt[2*Pi]) + ((1 + Erf[mu[1]/(Sqrt[2]*c[1])])*mu[1])/2 + (a*Erfc[mu[1]/(Sqrt[2]*c[1])]*mu[1])/2)*w[1]"
-# m_raw[2] = r"((c[0]*mu[0])/(E^(mu[0]^2/(2*c[0]^2))*Sqrt[2*Pi]) - (a^2*c[0]*mu[0])/(E^(mu[0]^2/(2*c[0]^2))*Sqrt[2*Pi]) + ((1 + Erf[mu[0]/(Sqrt[2]*c[0])])*(c[0]^2 + mu[0]^2))/2 + (a^2*Erfc[mu[0]/(Sqrt[2]*c[0])]*(c[0]^2 + mu[0]^2))/2)*w[0] + ((c[1]*mu[1])/(E^(mu[1]^2/(2*c[1]^2))*Sqrt[2*Pi]) - (a^2*c[1]*mu[1])/(E^(mu[1]^2/(2*c[1]^2))*Sqrt[2*Pi]) + ((1 + Erf[mu[1]/(Sqrt[2]*c[1])])*(c[1]^2 + mu[1]^2))/2 + (a^2*Erfc[mu[1]/(Sqrt[2]*c[1])]*(c[1]^2 + mu[1]^2))/2)*w[1]"
-# m_raw[3] = r"((c[0]*(2*c[0]^2 + mu[0]^2))/(E^(mu[0]^2/(2*c[0]^2))*Sqrt[2*Pi]) - (a^3*c[0]*(2*c[0]^2 + mu[0]^2))/(E^(mu[0]^2/(2*c[0]^2))*Sqrt[2*Pi]) + ((1 + Erf[mu[0]/(Sqrt[2]*c[0])])*mu[0]*(3*c[0]^2 + mu[0]^2))/2 + (a^3*Erfc[mu[0]/(Sqrt[2]*c[0])]*mu[0]*(3*c[0]^2 + mu[0]^2))/2)*w[0] + ((c[1]*(2*c[1]^2 + mu[1]^2))/(E^(mu[1]^2/(2*c[1]^2))*Sqrt[2*Pi]) - (a^3*c[1]*(2*c[1]^2 + mu[1]^2))/(E^(mu[1]^2/(2*c[1]^2))*Sqrt[2*Pi]) + ((1 + Erf[mu[1]/(Sqrt[2]*c[1])])*mu[1]*(3*c[1]^2 + mu[1]^2))/2 + (a^3*Erfc[mu[1]/(Sqrt[2]*c[1])]*mu[1]*(3*c[1]^2 + mu[1]^2))/2)*w[1]"
-# m_raw[4] = r"((c[0]*mu[0]*(5*c[0]^2 + mu[0]^2))/(E^(mu[0]^2/(2*c[0]^2))*Sqrt[2*Pi]) - (a^4*c[0]*mu[0]*(5*c[0]^2 + mu[0]^2))/(E^(mu[0]^2/(2*c[0]^2))*Sqrt[2*Pi]) + ((1 + Erf[mu[0]/(Sqrt[2]*c[0])])*(3*c[0]^4 + 6*c[0]^2*mu[0]^2 + mu[0]^4))/2 + (a^4*Erfc[mu[0]/(Sqrt[2]*c[0])]*(3*c[0]^4 + 6*c[0]^2*mu[0]^2 + mu[0]^4))/2)*w[0] + ((c[1]*mu[1]*(5*c[1]^2 + mu[1]^2))/(E^(mu[1]^2/(2*c[1]^2))*Sqrt[2*Pi]) - (a^4*c[1]*mu[1]*(5*c[1]^2 + mu[1]^2))/(E^(mu[1]^2/(2*c[1]^2))*Sqrt[2*Pi]) + ((1 + Erf[mu[1]/(Sqrt[2]*c[1])])*(3*c[1]^4 + 6*c[1]^2*mu[1]^2 + mu[1]^4))/2 + (a^4*Erfc[mu[1]/(Sqrt[2]*c[1])]*(3*c[1]^4 + 6*c[1]^2*mu[1]^2 + mu[1]^4))/2)*w[1]"
-# m_raw[5] = r"((c[0]*(c[0]^2 + mu[0]^2)*(8*c[0]^2 + mu[0]^2))/(E^(mu[0]^2/(2*c[0]^2))*Sqrt[2*Pi]) - (a^5*c[0]*(c[0]^2 + mu[0]^2)*(8*c[0]^2 + mu[0]^2))/(E^(mu[0]^2/(2*c[0]^2))*Sqrt[2*Pi]) + ((1 + Erf[mu[0]/(Sqrt[2]*c[0])])*mu[0]*(15*c[0]^4 + 10*c[0]^2*mu[0]^2 + mu[0]^4))/2 + (a^5*Erfc[mu[0]/(Sqrt[2]*c[0])]*mu[0]*(15*c[0]^4 + 10*c[0]^2*mu[0]^2 + mu[0]^4))/2)*w[0] + ((c[1]*(c[1]^2 + mu[1]^2)*(8*c[1]^2 + mu[1]^2))/(E^(mu[1]^2/(2*c[1]^2))*Sqrt[2*Pi]) - (a^5*c[1]*(c[1]^2 + mu[1]^2)*(8*c[1]^2 + mu[1]^2))/(E^(mu[1]^2/(2*c[1]^2))*Sqrt[2*Pi]) + ((1 + Erf[mu[1]/(Sqrt[2]*c[1])])*mu[1]*(15*c[1]^4 + 10*c[1]^2*mu[1]^2 + mu[1]^4))/2 + (a^5*Erfc[mu[1]/(Sqrt[2]*c[1])]*mu[1]*(15*c[1]^4 + 10*c[1]^2*mu[1]^2 + mu[1]^4))/2)*w[1]"
-# m_raw[6] = r"((c[0]*mu[0]*(33*c[0]^4 + 14*c[0]^2*mu[0]^2 + mu[0]^4))/(E^(mu[0]^2/(2*c[0]^2))*Sqrt[2*Pi]) - (a^6*c[0]*mu[0]*(33*c[0]^4 + 14*c[0]^2*mu[0]^2 + mu[0]^4))/(E^(mu[0]^2/(2*c[0]^2))*Sqrt[2*Pi]) + ((1 + Erf[mu[0]/(Sqrt[2]*c[0])])*(15*c[0]^6 + 45*c[0]^4*mu[0]^2 + 15*c[0]^2*mu[0]^4 + mu[0]^6))/2 + (a^6*Erfc[mu[0]/(Sqrt[2]*c[0])]*(15*c[0]^6 + 45*c[0]^4*mu[0]^2 + 15*c[0]^2*mu[0]^4 + mu[0]^6))/2)*w[0] + ((c[1]*mu[1]*(33*c[1]^4 + 14*c[1]^2*mu[1]^2 + mu[1]^4))/(E^(mu[1]^2/(2*c[1]^2))*Sqrt[2*Pi]) - (a^6*c[1]*mu[1]*(33*c[1]^4 + 14*c[1]^2*mu[1]^2 + mu[1]^4))/(E^(mu[1]^2/(2*c[1]^2))*Sqrt[2*Pi]) + ((1 + Erf[mu[1]/(Sqrt[2]*c[1])])*(15*c[1]^6 + 45*c[1]^4*mu[1]^2 + 15*c[1]^2*mu[1]^4 + mu[1]^6))/2 + (a^6*Erfc[mu[1]/(Sqrt[2]*c[1])]*(15*c[1]^6 + 45*c[1]^4*mu[1]^2 + 15*c[1]^2*mu[1]^4 + mu[1]^6))/2)*w[1]"
-# m_raw[7] = r"((c[0]*(48*c[0]^6 + 87*c[0]^4*mu[0]^2 + 20*c[0]^2*mu[0]^4 + mu[0]^6))/(E^(mu[0]^2/(2*c[0]^2))*Sqrt[2*Pi]) - (a^7*c[0]*(48*c[0]^6 + 87*c[0]^4*mu[0]^2 + 20*c[0]^2*mu[0]^4 + mu[0]^6))/(E^(mu[0]^2/(2*c[0]^2))*Sqrt[2*Pi]) + ((1 + Erf[mu[0]/(Sqrt[2]*c[0])])*mu[0]*(105*c[0]^6 + 105*c[0]^4*mu[0]^2 + 21*c[0]^2*mu[0]^4 + mu[0]^6))/2 + (a^7*Erfc[mu[0]/(Sqrt[2]*c[0])]*mu[0]*(105*c[0]^6 + 105*c[0]^4*mu[0]^2 + 21*c[0]^2*mu[0]^4 + mu[0]^6))/2)*w[0] + ((c[1]*(48*c[1]^6 + 87*c[1]^4*mu[1]^2 + 20*c[1]^2*mu[1]^4 + mu[1]^6))/(E^(mu[1]^2/(2*c[1]^2))*Sqrt[2*Pi]) - (a^7*c[1]*(48*c[1]^6 + 87*c[1]^4*mu[1]^2 + 20*c[1]^2*mu[1]^4 + mu[1]^6))/(E^(mu[1]^2/(2*c[1]^2))*Sqrt[2*Pi]) + ((1 + Erf[mu[1]/(Sqrt[2]*c[1])])*mu[1]*(105*c[1]^6 + 105*c[1]^4*mu[1]^2 + 21*c[1]^2*mu[1]^4 + mu[1]^6))/2 + (a^7*Erfc[mu[1]/(Sqrt[2]*c[1])]*mu[1]*(105*c[1]^6 + 105*c[1]^4*mu[1]^2 + 21*c[1]^2*mu[1]^4 + mu[1]^6))/2)*w[1]"
-# m_raw[8] = r"((c[0]*mu[0]*(279*c[0]^6 + 185*c[0]^4*mu[0]^2 + 27*c[0]^2*mu[0]^4 + mu[0]^6))/(E^(mu[0]^2/(2*c[0]^2))*Sqrt[2*Pi]) - (a^8*c[0]*mu[0]*(279*c[0]^6 + 185*c[0]^4*mu[0]^2 + 27*c[0]^2*mu[0]^4 + mu[0]^6))/(E^(mu[0]^2/(2*c[0]^2))*Sqrt[2*Pi]) + ((1 + Erf[mu[0]/(Sqrt[2]*c[0])])*(105*c[0]^8 + 420*c[0]^6*mu[0]^2 + 210*c[0]^4*mu[0]^4 + 28*c[0]^2*mu[0]^6 + mu[0]^8))/2 + (a^8*Erfc[mu[0]/(Sqrt[2]*c[0])]*(105*c[0]^8 + 420*c[0]^6*mu[0]^2 + 210*c[0]^4*mu[0]^4 + 28*c[0]^2*mu[0]^6 + mu[0]^8))/2)*w[0] + ((c[1]*mu[1]*(279*c[1]^6 + 185*c[1]^4*mu[1]^2 + 27*c[1]^2*mu[1]^4 + mu[1]^6))/(E^(mu[1]^2/(2*c[1]^2))*Sqrt[2*Pi]) - (a^8*c[1]*mu[1]*(279*c[1]^6 + 185*c[1]^4*mu[1]^2 + 27*c[1]^2*mu[1]^4 + mu[1]^6))/(E^(mu[1]^2/(2*c[1]^2))*Sqrt[2*Pi]) + ((1 + Erf[mu[1]/(Sqrt[2]*c[1])])*(105*c[1]^8 + 420*c[1]^6*mu[1]^2 + 210*c[1]^4*mu[1]^4 + 28*c[1]^2*mu[1]^6 + mu[1]^8))/2 + (a^8*Erfc[mu[1]/(Sqrt[2]*c[1])]*(105*c[1]^8 + 420*c[1]^6*mu[1]^2 + 210*c[1]^4*mu[1]^4 + 28*c[1]^2*mu[1]^6 + mu[1]^8))/2)*w[1]"
-# m_raw[9] = r"(-((a^9*c[0]*(384*c[0]^8 + 975*c[0]^6*mu[0]^2 + 345*c[0]^4*mu[0]^4 + 35*c[0]^2*mu[0]^6 + mu[0]^8))/(E^(mu[0]^2/(2*c[0]^2))*Sqrt[2*Pi])) + (a^9*Erfc[mu[0]/(Sqrt[2]*c[0])]*mu[0]*(945*c[0]^8 + 1260*c[0]^6*mu[0]^2 + 378*c[0]^4*mu[0]^4 + 36*c[0]^2*mu[0]^6 + mu[0]^8))/2 + (945*c[0]^8*mu[0] + 1260*c[0]^6*mu[0]^3 + 378*c[0]^4*mu[0]^5 + 36*c[0]^2*mu[0]^7 + mu[0]^9 + (Sqrt[2/Pi]*c[0]*(384*c[0]^8 + 975*c[0]^6*mu[0]^2 + 345*c[0]^4*mu[0]^4 + 35*c[0]^2*mu[0]^6 + mu[0]^8))/E^(mu[0]^2/(2*c[0]^2)) + Erf[mu[0]/(Sqrt[2]*c[0])]*(945*c[0]^8*mu[0] + 1260*c[0]^6*mu[0]^3 + 378*c[0]^4*mu[0]^5 + 36*c[0]^2*mu[0]^7 + mu[0]^9))/2)*w[0] + (-((a^9*c[1]*(384*c[1]^8 + 975*c[1]^6*mu[1]^2 + 345*c[1]^4*mu[1]^4 + 35*c[1]^2*mu[1]^6 + mu[1]^8))/(E^(mu[1]^2/(2*c[1]^2))*Sqrt[2*Pi])) + (a^9*Erfc[mu[1]/(Sqrt[2]*c[1])]*mu[1]*(945*c[1]^8 + 1260*c[1]^6*mu[1]^2 + 378*c[1]^4*mu[1]^4 + 36*c[1]^2*mu[1]^6 + mu[1]^8))/2 + (945*c[1]^8*mu[1] + 1260*c[1]^6*mu[1]^3 + 378*c[1]^4*mu[1]^5 + 36*c[1]^2*mu[1]^7 + mu[1]^9 + (Sqrt[2/Pi]*c[1]*(384*c[1]^8 + 975*c[1]^6*mu[1]^2 + 345*c[1]^4*mu[1]^4 + 35*c[1]^2*mu[1]^6 + mu[1]^8))/E^(mu[1]^2/(2*c[1]^2)) + Erf[mu[1]/(Sqrt[2]*c[1])]*(945*c[1]^8*mu[1] + 1260*c[1]^6*mu[1]^3 + 378*c[1]^4*mu[1]^5 + 36*c[1]^2*mu[1]^7 + mu[1]^9))/2)*w[1]"
-# m_raw[10]= r"((c[0]*mu[0]*(2895*c[0]^8 + 2640*c[0]^6*mu[0]^2 + 588*c[0]^4*mu[0]^4 + 44*c[0]^2*mu[0]^6 + mu[0]^8))/(E^(mu[0]^2/(2*c[0]^2))*Sqrt[2*Pi]) + ((1 + Erf[mu[0]/(Sqrt[2]*c[0])])*(945*c[0]^10 + 4725*c[0]^8*mu[0]^2 + 3150*c[0]^6*mu[0]^4 + 630*c[0]^4*mu[0]^6 + 45*c[0]^2*mu[0]^8 + mu[0]^10))/2 + (a^10*(-((Sqrt[2/Pi]*c[0]*mu[0]*(2895*c[0]^8 + 2640*c[0]^6*mu[0]^2 + 588*c[0]^4*mu[0]^4 + 44*c[0]^2*mu[0]^6 + mu[0]^8))/E^(mu[0]^2/(2*c[0]^2))) + Erfc[mu[0]/(Sqrt[2]*c[0])]*(945*c[0]^10 + 4725*c[0]^8*mu[0]^2 + 3150*c[0]^6*mu[0]^4 + 630*c[0]^4*mu[0]^6 + 45*c[0]^2*mu[0]^8 + mu[0]^10)))/2)*w[0] + ((c[1]*mu[1]*(2895*c[1]^8 + 2640*c[1]^6*mu[1]^2 + 588*c[1]^4*mu[1]^4 + 44*c[1]^2*mu[1]^6 + mu[1]^8))/(E^(mu[1]^2/(2*c[1]^2))*Sqrt[2*Pi]) + ((1 + Erf[mu[1]/(Sqrt[2]*c[1])])*(945*c[1]^10 + 4725*c[1]^8*mu[1]^2 + 3150*c[1]^6*mu[1]^4 + 630*c[1]^4*mu[1]^6 + 45*c[1]^2*mu[1]^8 + mu[1]^10))/2 + (a^10*(-((Sqrt[2/Pi]*c[1]*mu[1]*(2895*c[1]^8 + 2640*c[1]^6*mu[1]^2 + 588*c[1]^4*mu[1]^4 + 44*c[1]^2*mu[1]^6 + mu[1]^8))/E^(mu[1]^2/(2*c[1]^2))) + Erfc[mu[1]/(Sqrt[2]*c[1])]*(945*c[1]^10 + 4725*c[1]^8*mu[1]^2 + 3150*c[1]^6*mu[1]^4 + 630*c[1]^4*mu[1]^6 + 45*c[1]^2*mu[1]^8 + mu[1]^10)))/2)*w[1]"
-
-# # Turn Mathematica expressions into usable python expressions
-# m = [None] *(number_of_moments)
-
-# for i,m in enumerate(m_raw):
-#     if i == 0:
-#         continue
-#     # Replace \[Pi] with Pi in the expressions so python can read it
-#     m_raw[i] = replace_pi(m_raw[i])
-#     # Replace mu[i] with mui when i is a variable integer
-#     m_raw[i] = replace_mu_index(m_raw[i])
-#     # Replace w[i] with wi when i is a variable integer
-#     m_raw[i] = replace_w_index(m_raw[i])
-#     # Replace c[i] with ci when i is a variable integer
-#     m_raw[i] = replace_c_index(m_raw[i])
-
-# #Parse every expression for translation
-# mp = []
-# for mx in m_raw:
-#     if mx is None:
-#         continue
-#     mp.append(parse_mathematica(mx)) 
-
-# #Replace the function expressions with handles
-# for i, mx in enumerate(mp):
-#     mp[i] = mx.replace(
-#         lambda x: x.func.__name__ == 'Erf',
-#         lambda x: erf(x.args[0])
-#     ).replace(
-#         lambda x: x.func.__name__ == 'Erfc',
-#         lambda x: erfc(x.args[0])
-#     )   
-
-# print("Parsed Mathematica expressions:")
-# for i, mx in enumerate(mp):
-#     print(f"m[{i}] = {mx}")
-# print("")
-
-# def compute_moments_analytic(a_test, c0_test, c1_test, mu0_test, mu1_test, w0_test, w1_test):
-#     """
-#     Compute the moments for a two component Gaussian Mixture analytically using the provided parameters.
-#     c is the covariance, will be replaced with stddev in the function itself
-#     """
-#     # Substitute Values (Take care for variance and stddev)
-#     values = {a: a_test, c0: np.sqrt(c0_test), c1:np.sqrt(c1_test), mu0: mu0_test, mu1:mu1_test, w0: w0_test, w1: w1_test}
-#     moments_analytic = []
-#     for i, mx in enumerate(mp):
-#         evaluated_expr = mx.subs(values)
-#         # Numerically evaluate the result
-#         result = evaluated_expr.evalf()
-#         moments_analytic.append(result)
-#     return moments_analytic
-
-def fit_gm_moments(params,args):
-    """
-    Fit the Gaussian Mixture model to the moments using least squares optimization.
-    """
-    # Call optimizer with bounds
-    result = least_squares(residuals_weighted, params, args=args, bounds=([0, -np.inf, -np.inf, 0, 0], [1.0, np.inf, np.inf, np.inf, np.inf]))
-    return result
-
+    # This should return a scalar value
+    return residuals
 
 #########################################################################################   
 # Define the network class to build actual architecture
@@ -809,20 +591,19 @@ class GaussianMixtureNetwork():
             # Match the GM parameters to the moments
             means, variances, weights = match_moments_2(moments_pre, components = 2)
 
-            self.means_gm_pre[0][i,:] = np.array(means)
-            self.variances_gm_pre[0][i,:] = np.array(variances)
-            self.weights_gm_pre[0][i,:] = np.array(weights)
+            self.means_gm_pre[0][i,:] = means
+            self.variances_gm_pre[0][i,:] = variances
+            self.weights_gm_pre[0][i,:] = weights
 
             # Match Post-Activation
             # Compute moments of the post activation
-            print(f"Call PA in Neuron {i}, layer 0")
             moments_post =  moments_post_act(self.a_relu, means, variances, weights)
 
             # Match the GM parameters to the moments
             means, variances, weights = match_moments_2(moments_post, components = 2)
-            self.means_gm_post[0][i,:] = np.array(means)
-            self.variances_gm_post[0][i,:] = np.array(variances)
-            self.weights_gm_post[0][i,:] = np.array(weights)
+            self.means_gm_post[0][i,:] = means
+            self.variances_gm_post[0][i,:] = variances
+            self.weights_gm_post[0][i,:] = weights
 
         ######
         # Iterate over the rest of the layers
@@ -850,7 +631,6 @@ class GaussianMixtureNetwork():
                 # Match Post-Activation
                 if self.activations[l-1] == 'relu':
                     # Compute moments of the post activation
-                    print(f"Call PA in Neuron {i}, layer {l}..")
                     moments_post =  moments_post_act(self.a_relu, means, variances, weights)
 
                     # Match the GM parameters to the moments
@@ -859,9 +639,9 @@ class GaussianMixtureNetwork():
                 elif self.activations[l-1] == 'linear':
                     moments_post = moments_pre
 
-                self.means_gm_post[l][i,:] = np.array(means)
-                self.variances_gm_post[l][i,:] = np.array(variances)
-                self.weights_gm_post[l][i,:] = np.array(weights)
+                self.means_gm_post[l][i,:] = means
+                self.variances_gm_post[l][i,:] = variances
+                self.weights_gm_post[l][i,:] = weights
 
         ######
         return self.means_gm_post[-1], self.variances_gm_post[-1], self.weights_gm_post[-1]
