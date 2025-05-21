@@ -442,7 +442,7 @@ class GaussianMixtureNetwork():
         # Iterate over the layers
         for i in range(len(self.layers)-1):
             # Initialize the weights for each layer. Add 1 for the bias
-            weight_mean = np.random.normal(0, 1, (self.layers[i]+1, self.layers[i+1]))
+            weight_mean = np.random.rand(self.layers[i]+1, self.layers[i+1])
             self.weight_means.append(weight_mean)
             weight_variance = np.ones((self.layers[i]+1, self.layers[i+1]))
             self.weight_variances.append(weight_variance)
@@ -468,6 +468,23 @@ class GaussianMixtureNetwork():
             self.means_gm_post.append(np.zeros((self.layers[i+1], self.components_post)))
             self.variances_gm_post.append(np.zeros((self.layers[i+1], self.components_post)))
             self.weights_gm_post.append(np.zeros((self.layers[i+1], self.components_post)))
+
+        # Generate pre-activation moment container for analytic
+        self.pre_activation_moments_analytic = []
+        # Iterate through layers
+        for i in range(len(self.layers)-1):
+            samples = np.zeros((self.layers[i+1],10))
+
+            self.pre_activation_moments_analytic.append(samples)
+        
+        # Generate post-activation moment container for analytic
+        self.post_activation_moments_analytic = []
+        # Iterate through layers
+        for i in range(len(self.layers)-1):
+            samples = np.zeros((self.layers[i+1],10))
+
+            self.post_activation_moments_analytic.append(samples)
+
 
     def sample_weights(self):
         """Generate samples of every weight and bias in the network"""
@@ -513,22 +530,6 @@ class GaussianMixtureNetwork():
 
             self.post_activation_moments_samples.append(samples)
         
-        # Generate pre-activation moment container for analytic
-        self.pre_activation_moments_analytic = []
-        # Iterate through layers
-        for i in range(len(self.layers)-1):
-            samples = np.zeros((self.layers[i+1],10))
-
-            self.pre_activation_moments_analytic.append(samples)
-        
-        # Generate post-activation moment container for analytic
-        self.post_activation_moments_analytic = []
-        # Iterate through layers
-        for i in range(len(self.layers)-1):
-            samples = np.zeros((self.layers[i+1],10))
-
-            self.post_activation_moments_analytic.append(samples)
-
 
     def set_act_func(self):
         """Set the activation functions for the network"""
@@ -603,11 +604,6 @@ class GaussianMixtureNetwork():
             self.variances_gm_pre[0][i,:] = variances
             self.weights_gm_pre[0][i,:] = weights
 
-            print(f"Pre-Activation Mean: {self.pre_activation_moments_analytic[0][i,0]}")
-            print(f"Pre activation GM Means: {self.means_gm_pre[0][i,:]}")
-            print(f"Pre activation GM Variances: {self.variances_gm_pre[0][i,:]}")
-            print(f"Pre activation GM Weights: {self.weights_gm_pre[0][i,:]}")
-
             # Match Post-Activation
             # Compute moments of the post activation
             moments_post =  moments_post_act(self.a_relu, means, variances, weights)
@@ -632,7 +628,9 @@ class GaussianMixtureNetwork():
                 # Augment the Bias neuron and assemble the parameter list
                 z_complete = np.stack((self.means_gm_post[l-1][:, :], self.variances_gm_post[l-1][:, :], self.weights_gm_post[l-1][:, :]),axis=1)
                 z_complete = np.concatenate((z_complete, np.zeros((1, 3, 2))), axis=0)
-                z_complete[-1, 0, 0] = 1 # Bias as fictive GM component with mean 1
+                z_complete[-1, 0, 0] = 1 # Bias as fictive GM component with mean 1, cov 0 
+                z_complete[-1, 1, 0] = 0 # and variance 0
+                z_complete[-1, 2, 0] = 1 # and weight 1
                 w_complete = np.stack((self.weight_means[l][:,i], self.weight_variances[l][:,i]), axis=1)
                 moments_pre = moments_pre_act_combined_general(z_complete, w_complete)
 
@@ -641,12 +639,12 @@ class GaussianMixtureNetwork():
                 # Match the GM parameters to the moments
                 means, variances, weights = match_moments_2(moments_pre, components = 2)
 
-                self.means_gm_pre[l][i,:] = np.array(means)
-                self.variances_gm_pre[l][i,:] = np.array(variances)
-                self.weights_gm_pre[l][i,:] = np.array(weights)
+                self.means_gm_pre[l][i,:] = means
+                self.variances_gm_pre[l][i,:] = variances
+                self.weights_gm_pre[l][i,:] = weights
 
                 # Match Post-Activation
-                if self.activations[l-1] == 'relu':
+                if self.activations[l] == 'relu':
                     # Compute moments of the post activation
                     moments_post =  moments_post_act(self.a_relu, means, variances, weights)
 
@@ -655,7 +653,7 @@ class GaussianMixtureNetwork():
                     # Match the GM parameters to the moments
                     means, variances, weights = match_moments_2(moments_post, components = 2)
                     
-                elif self.activations[l-1] == 'linear':
+                elif self.activations[l] == 'linear':
                     moments_post = moments_pre
 
                     self.post_activation_moments_analytic[l][i,:] = moments_post
@@ -695,9 +693,6 @@ class GaussianMixtureNetwork():
             # pre_act_samples shape: (verif_samples,)
             pre_act_samples = np.dot(x.squeeze(), self.weight_samples[0][:, :, i].T)
 
-            print(f"Pre-Activation sample mean: {np.mean(pre_act_samples)}")
-            print(f"Pre-Activation sample variance: {np.var(pre_act_samples)}")
-
             # Compute the empirical moments of the sample set
             moments = np.zeros(10)
             for order in range(1, 11):
@@ -725,6 +720,7 @@ class GaussianMixtureNetwork():
         for l in range(1, len(self.layers)-1):
             # Compute pre avtivation 
             # pre_act_samples shape: (verif_samples,neurons)
+            # Append the post activation samples with from before with bias samples
             pre_act_samples = np.einsum('bi,bij->bj', self.post_activation_samples[l-1], self.weight_samples[l])
 
             # Compute the empirical moments of the sample set
@@ -743,10 +739,10 @@ class GaussianMixtureNetwork():
                 for order in range(1, 11):
                     moments[order-1] = np.mean(post_act_samples[:,i]**order)
 
-            self.post_activation_moments_samples[l][i, :] = moments
+                self.post_activation_moments_samples[l][i, :] = moments
 
 
-            self.post_activation_samples[l] = post_act_samples
+            self.post_activation_samples[l][:,:-1] = post_act_samples
 
         ######
         return self.post_activation_samples[-1]
