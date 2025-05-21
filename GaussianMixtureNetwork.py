@@ -6,6 +6,7 @@
 import numpy as np
 from scipy.special import erf, erfc
 from scipy.optimize import least_squares, minimize
+from math import factorial
 
 # Noncentral moments of a Gaussian, parametrized with the covariance
 def  e1(mu):
@@ -171,139 +172,72 @@ def e20_gm(w: np.array, mu: np.array, c: np.array):
     return e20_gm
 
 # Next generation of functions
-def moments_pre_act_single_det(x,mu_w,c_w):
-    """This function computes the first ten moments of the random variable product w*x, 
-        where z_in is a dseterministic scalar valkue and w is a Gaussian random variable.
+def generate_k_tuples(n, m):
+    """
+    Generate all m-tuples of non-negative integers (k_1,...,k_m) such that sum(k_i) = n.
+    Yields one tuple at a time.
+    I need this for the multinomial expansion
+    """
+    if m == 1:
+        yield (n,)
+    else:
+        for i in range(n + 1):
+            for tail in generate_k_tuples(n - i, m - 1):
+                yield (i,) + tail
 
-        x: The input value
-        mu_w: Mean of the Gaussian random variable w
-        c_w: Variance of the Gaussian random variable w
-
-        Returns: A vector of the first ten moments of the random variable product w*x
-        """
-    # Check the shape of the input
-    #assert x.shape == (1,), "x must be a scalar value"
-
-    # Initialize result vector 
-    result = np.zeros(10, dtype=float)
-
-    result[0] = x*e1(mu_w)           #First Moment
-    result[1] = x**2*e2(mu_w,c_w)    #Second Moment
-    result[2] = x**3*e3(mu_w,c_w)    #Third Moment
-    result[3] = x**4*e4(mu_w,c_w)    #Fourth Moment
-    result[4] = x**5*e5(mu_w,c_w)    #Fifth Moment
-    result[5] = x**6*e6(mu_w,c_w)    #Sixth Moment
-    result[6] = x**7*e7(mu_w,c_w)    #Seventh Moment
-    result[7] = x**8*e8(mu_w,c_w)    #Eighth Moment
-    result[8] = x**9*e9(mu_w,c_w)    #Ninth Moment
-    result[9] = x**10*e10(mu_w,c_w)  #Tenth Moment
-
-    return result
-
-def moments_pre_act_combined_det(x_list,w_list):
+def moments_pre_act_combined_general(z:np.ndarray,w:np.ndarray):
     """ This function computes the first ten moments of the pre activation value for a single neuron with multiple products input and weight.
 
-        x_list is a list containing the input values
-        w_list is a list containing tuples of the form (mu_w, c_w) for every entry repsresenting the weights as Gaussian
+        z is an array containing the the input values. Every row is a different GM with [[mu1,mu2...muN],[c1,c2...cN],[w1,w2...wN]] and resembles one neuronal output from before
+        w is an array containing tuples of the form (mu_w, c_w) for every entry representing the weight as independent Gaussian
 
-        returns a vector of the first ten moments of the pre activation value
+        returns an array of the first ten moments of the pre activation value
     """
 
-    #MISLEADING: BOTH INPUTS ARE ARRAYS
+    number_moments = 10 #If we want to change this, we need to add more moments to the functions above
 
-    number_moments = 10
+    # In general, x_array could be a gaussian mixture or deterministic. 
+    # If it is deterministic, it will be the value as the first mean, 1 as the first weight and all other values in the GM specification will be zero
+    
+    assert z.shape[0] == w.shape[0], "z and w must have the same length, but have lengths {} and {}".format(z.shape[0], w.shape[0])  
 
-    assert len(x_list) == len(w_list), "x_list and w_list must have the same length, but have lengths {} and {}".format(len(x_list), len(w_list))  
+    # Pre-Compute the moments of each w (w is always a Gaussian, so this is always needed)
+    moments_w = np.zeros((len(w), number_moments+1))
+    for i in range(w.shape[0]):
+        mu_w, c_w = w[i]
+        # Save the moments, augment a 0 moment to avoid indexing issues with the multinomial indexing
+        moments_w[i] = [1 ,e1(mu_w), e2(mu_w, c_w), e3(mu_w, c_w), e4(mu_w, c_w), e5(mu_w, c_w), e6(mu_w, c_w), e7(mu_w, c_w), e8(mu_w, c_w), e9(mu_w, c_w), e10(mu_w, c_w)]
+
+    # Pre-Compute the Moments of each z (z could be Deterministic or GM, but the gm-moment-generation will handle this flexible)
+    moments_z = np.zeros((len(z), number_moments+1))
+    for i in range(z.shape[0]):
+        # mu, c and w are potentially multi-component GMs
+        mu_z, c_z, w_z = z[i]
+        # Save the moments, augment a 0 moment to avoid indexing issues with the multinomial indexing
+        moments_z[i] = [1 ,e1_gm(w_z, mu_z, c_z), e2_gm(w_z, mu_z, c_z), e3_gm(w_z, mu_z, c_z), e4_gm(w_z, mu_z, c_z), e5_gm(w_z, mu_z, c_z), e6_gm(w_z, mu_z, c_z), e7_gm(w_z, mu_z, c_z), e8_gm(w_z, mu_z, c_z), e9_gm(w_z, mu_z, c_z), e10_gm(w_z, mu_z, c_z)]
 
     # Initialize result vector 
     result = np.zeros(number_moments)
 
-    # Iterate through the list
-    for i in range(len(x_list)):
-        x = x_list[i]
-        mu_w, c_w = w_list[i]
+    # Computation of the first ten moments
+    for i in range(1,number_moments+1):
+        # Get multinomial tuples for the desired moment and number of neuron inputs
+        tuples = np.array(tuple(generate_k_tuples(i, z.shape[0])))
 
-        # Call the moments_pre_act_single function for each entry
-        result += moments_pre_act_single_det(x,mu_w,c_w)
-
+        # Iterate through the tuples (I turned it into an array, but still refer to it as value tuples)
+        for t in range(len(tuples)):
+            # Compute the multinomial coefficient of the current tuple
+            multinom_coeff =  factorial(i) // np.prod([factorial(k) for k in tuples[t,:]])
+            # Iterate through the tuple for every x_i and w_i in the pre-activation sum
+            expectation_product = 1
+            for j in range(z.shape[0]):
+                k = tuples[t,j]
+                # Do the expectation product
+                expectation_product *= moments_z[j][k] * moments_w[j][k]
+            # Add up all the values for the moments
+            result[i-1] += multinom_coeff * expectation_product
     return result
 
-
-def moments_pre_act_single(mu_w:np.ndarray,c_w:np.ndarray,mu_z:np.ndarray,c_z:np.ndarray,w_z:np.ndarray):
-    """This function computes the first ten moments of the random variable product w*z_in, 
-        where z_in is a scalar Gaussian Mixture with arbitrary number of components and w is a Gaussian random variable.
-
-        mu_w: Mean of the Gaussian random variable w
-        c_w: Variance of the Gaussian random variable w
-        mu_z: Mean vector of the Gaussian Mixture
-        c_z: Variance array of the Gaussian Mixture
-        w_z: Weights of the Gaussian Mixture
-
-        Returns: A vector of the first ten moments of the random variable product w*z_in
-        """
-    
-    num_moments = 10
-    # Check ths shape parameters of the GM
-    assert len(mu_z) == len(c_z) == len(w_z), "mu_z, c_z, and w_z must have the same length"
-    #assert len(mu_w) == len(c_w) == 1 , "mu_w and c_w must have length 1"
-    assert np.isclose(np.sum(w_z), 1.0), "Weights of the Gaussian Mixture must sum to 1"
-
-    # Initialize result vector 
-    result = np.zeros(num_moments, dtype=float)
-
-    #Iterate over the components of the GM
-    for i in range(len(mu_z)):
-        assert c_z[i] >= 0, "Variance must be non-negative"
-        # Add moments up to ten for each component
-        result[0] += w_z[i] * mu_w * mu_z[i]    #First Moment
-        result[1] += w_z[i] * (mu_w**2 + c_w) * (c_z[i] + mu_z[i]**2)    #Second Moment
-        result[2] += w_z[i] * mu_w *mu_z[i]*(mu_w**2+3*c_w)*(mu_z[i]**2+3*c_z[i])    #Third Moment
-        result[3] += w_z[i] * (mu_w**4+6*mu_w**2*c_w+3*c_w**2)*(mu_z[i]**4+6*mu_z[i]**2*c_z[i]+3*c_z[i]**2)  #Fourth Moment
-        result[4] += w_z[i] * mu_w*mu_z[i]*(mu_w**4 +10*mu_w**2*c_w+15*c_w**2)*(mu_z[i]**4+10*mu_z[i]**2*c_z[i]+15*c_z[i]**2)  #Fifth Moment
-        result[5] += w_z[i] * (mu_w**6+15*mu_w**4*c_w+45*mu_w**2*c_w**2+15*c_w**3)*(mu_z[i]**6+15*mu_z[i]**4*c_z[i]+45*mu_z[i]**2*c_z[i]**2+15*c_z[i]**3)  #Sixth Moment
-        result[6] += w_z[i] * mu_w*mu_z[i]*(mu_w**6+21*mu_w**4*c_w+105*mu_w**2*c_w**2+105*c_w**3)*(mu_z[i]**6+21*mu_z[i]**4*c_z[i]+105*mu_z[i]**2*c_z[i]**2+105*c_z[i]**3)  #Seventh Moment
-        result[7] += w_z[i] * (mu_w**8+28*mu_w**6*c_w+210*mu_w**4*c_w**2+420*mu_w**2*c_w**3+28*c_w**4)*(mu_z[i]**8+28*mu_z[i]**6*c_z[i]+210*mu_z[i]**4*c_z[i]**2+420*mu_z[i]**2*c_z[i]**3+28*c_z[i]**4)  #Eighth Moment
-        result[8] += w_z[i] * mu_w*mu_z[i]*(mu_w**8+36*mu_w**6*c_w+378*mu_w**4*c_w**2+1260*mu_w**2*c_w**3+378*c_w**4)*(mu_z[i]**8+36*mu_z[i]**6*c_z[i]+378*mu_z[i]**4*c_z[i]**2+1260*mu_z[i]**2*c_z[i]**3+378*c_z[i]**4)  #Ninth Moment
-        result[9] += w_z[i] * (mu_w**10+45*mu_w**8*c_w+630*mu_w**6*c_w**2+3150*mu_w**4*c_w**3+4725*mu_w**2*c_w**4+945*c_w**5)*(mu_z[i]**10+45*mu_z[i]**8*c_z[i]+630*mu_z[i]**6*c_z[i]**2+3150*mu_z[i]**4*c_z[i]**3+4725*mu_z[i]**2*c_z[i]**4+945*c_z[i]**5)  #Tenth Moment
-
-    return result
-
-def moments_pre_act_combined(w_list,z_list):
-    """ This function computes the first ten moments of the pre activation value for a single neuron with multiple products of random variables.
-
-        w_list is a list containing tuples of the form (mu_w, c_w) for every entry repsresenting the weights as Gaussian
-        z_list is a list containing tuples of the form ((mu_z1,mu_z2), (c_z1,c_z2),(w_z1,w_z2)) for every "row"" representing the GM parameterrs for 1 neuron beforehand
-        This means that z_list ia s 3-dimensional-array with first = number of before neurons, second= mu,c,w, third = number of components
-        The last entry in z_list is the bias neuron, which is deterministic and faked so it is like (1,0),(0,0)(0,0) but only the first one is important
-
-
-        BUT: The last entry in z_list is deternministic as it comes from the bias neuron in the befrorehand layer
-
-        returns a vector of the first ten moments of the pre activation value
-    """
-
-    #MISLEADING: BOTH INPUTS ARE ARRAYS
-    num_moments = 10
-
-    assert len(w_list) == len(z_list), "w_list and z_list must have the same length. but have lengths {} and {}".format(len(w_list), len(z_list))
-
-    # Initialize result vector 
-    result = np.zeros(num_moments, dtype=float)
-
-    # Iterate through the list
-    for i in range(len(w_list)-1):
-        mu_w, c_w = w_list[i]
-        mu_z, c_z, w_z = z_list[i]
-
-        # Call the moments_pre_act_single function for each entry
-        result += moments_pre_act_single(mu_w,c_w,mu_z,c_z,w_z)
-    
-    #Bias handling
-    mu_w, c_w = w_list[-1]
-    z_bias = z_list[-1,0,0]
-    result += moments_pre_act_single_det(z_bias,mu_w,c_w)
-
-    return result
 
 def moments_post_act(a:float,mu:np.ndarray,c:np.ndarray,w:np.ndarray):
     """This function computes the post activation moments of a Gaussian mixture with arbitrary many components propagated through leaky relu
@@ -380,7 +314,7 @@ def match_moments_2(in_mom, components):
     if components != 2:
         raise ValueError("This function only works for two components")
     
-    params = [0.5,0.0,1.0,1.0,1.0]  # Initial guess for [w0, mu0, mu1, c0, c1]
+    params = [0.5,0.1,1.0,2.0,1.0]  # Initial guess for [w0, mu0, mu1, c0, c1]
 
     # Call optimizer with bounds
     result = least_squares(residuals_matching, params, args=in_mom, bounds=([0, -np.inf, -np.inf, 0, 0], [1.0, np.inf, np.inf, np.inf, np.inf]))
@@ -389,10 +323,15 @@ def match_moments_2(in_mom, components):
     mu_res = [result.x[1], result.x[2]]
     c_res = [result.x[3], result.x[4]]
 
+    #print(f"Finished with residuum: {result.cost}")
+
     return np.array(mu_res), np.array(c_res), np.array(w_res)
 
 def residual_sum_matching(params, t):
-    """Compute the residual value for the optimization process."""
+    """
+        Compute the residual value for the optimization process.
+        Return the Sum of the residuals for each moment.
+    """
     # Infer how many components we have
     components = int(len(params)/3)
     # Extract the parameters from the input vector
@@ -425,7 +364,11 @@ def residual_sum_matching(params, t):
     return residual_sum
 
 def residuals_matching(params, *args):
-    """Compute the residual value for the optimization process."""
+    """
+        Compute the residual value for the optimization process.
+        Returns the array of indivudal residuals for each moment.
+    """
+    # Unpack the arguments
     t = []
     for temp in args:
         t.append(temp)
@@ -433,9 +376,9 @@ def residuals_matching(params, *args):
     # Infer how many components we have
     components = int(len(params)/3)
     # Extract the parameters from the input vector
-    w = params[:components]
-    mu = params[components:components*2]
-    c = params[components*2:components*3]
+    w = params[:1]
+    mu = params[1:3]
+    c = params[3:5]
 
     # Compute the moments of the Gaussian Mixture
     gm_moments = np.zeros(10, dtype=float)
@@ -455,7 +398,7 @@ def residuals_matching(params, *args):
     for i in range(10):
         residuals[i] = abs(gm_moments[i] - t[i])/t[i]
 
-    # This should return a scalar value
+    # This should return an array
     return residuals
 
 #########################################################################################   
@@ -480,6 +423,7 @@ class GaussianMixtureNetwork():
         self.components_pre = components_pre
         self.components_post = components_post
         self.a_relu = a_relu
+        self.verif_samples = 1000000
 
         # Intialize the weights and biases
         self.init_parameters()
@@ -498,7 +442,7 @@ class GaussianMixtureNetwork():
         # Iterate over the layers
         for i in range(len(self.layers)-1):
             # Initialize the weights for each layer. Add 1 for the bias
-            weight_mean = np.random.normal(0, 1, (self.layers[i]+1, self.layers[i+1]))+1
+            weight_mean = np.random.normal(0, 1, (self.layers[i]+1, self.layers[i+1]))
             self.weight_means.append(weight_mean)
             weight_variance = np.ones((self.layers[i]+1, self.layers[i+1]))
             self.weight_variances.append(weight_variance)
@@ -524,6 +468,66 @@ class GaussianMixtureNetwork():
             self.means_gm_post.append(np.zeros((self.layers[i+1], self.components_post)))
             self.variances_gm_post.append(np.zeros((self.layers[i+1], self.components_post)))
             self.weights_gm_post.append(np.zeros((self.layers[i+1], self.components_post)))
+
+    def sample_weights(self):
+        """Generate samples of every weight and bias in the network"""
+        # Generate weight samples
+        self.weight_samples = []
+        # Iterate through layers
+        for i in range(len(self.layers)-1):
+            # Shape: (verif_samples, in_features+1, out_features)
+            samples = np.zeros((self.verif_samples, self.layers[i]+1, self.layers[i+1]))
+            for row in range(self.layers[i]+1):
+                for col in range(self.layers[i+1]):
+                    samples[:, row, col] = np.random.normal(
+                    self.weight_means[i][row, col],
+                    self.weight_variances[i][row, col],
+                    self.verif_samples
+                    )
+            self.weight_samples.append(samples)
+        
+        # Generate post-activation sample container
+        self.post_activation_samples = []
+        # Iterate through layers
+        for i in range(len(self.layers)-1):
+            # Shape: (verif_samples, number of neurons in the layer+1)
+            samples = np.zeros((self.verif_samples, self.layers[i+1]+1))
+            #Turn the Bias samples onto ones
+            samples[:, -1] = 1
+
+            self.post_activation_samples.append(samples)
+
+        # Generate pre-activation moment container
+        self.pre_activation_moments_samples = []
+        # Iterate through layers
+        for i in range(len(self.layers)-1):
+            samples = np.zeros((self.layers[i+1],10))
+
+            self.pre_activation_moments_samples.append(samples)
+        
+        # Generate post-activation moment container
+        self.post_activation_moments_samples = []
+        # Iterate through layers
+        for i in range(len(self.layers)-1):
+            samples = np.zeros((self.layers[i+1],10))
+
+            self.post_activation_moments_samples.append(samples)
+        
+        # Generate pre-activation moment container for analytic
+        self.pre_activation_moments_analytic = []
+        # Iterate through layers
+        for i in range(len(self.layers)-1):
+            samples = np.zeros((self.layers[i+1],10))
+
+            self.pre_activation_moments_analytic.append(samples)
+        
+        # Generate post-activation moment container for analytic
+        self.post_activation_moments_analytic = []
+        # Iterate through layers
+        for i in range(len(self.layers)-1):
+            samples = np.zeros((self.layers[i+1],10))
+
+            self.post_activation_moments_analytic.append(samples)
 
 
     def set_act_func(self):
@@ -568,7 +572,8 @@ class GaussianMixtureNetwork():
         Forward pass through the network based on the method of moments.
         x: Input data, deterministic
         """
-        x = np.array([[x]])
+        if isinstance(x,float) or isinstance(x,int):    
+            x = np.array([[x]])
 
         assert len(x) == self.layers[0], f"Input data must have {self.layers[0]} features, but got {len(x)}"
 
@@ -585,8 +590,11 @@ class GaussianMixtureNetwork():
         for i in range(self.layers[1]):
             # Match Pre-Activation
             # Compute moments of the pre activation (Weights for one neuron are one column of the weight matrix)
-            w_list = np.stack((self.weight_means[0][:,i], self.weight_variances[0][:,i]), axis=1)
-            moments_pre = moments_pre_act_combined_det(x,w_list)
+            w_array = np.stack((self.weight_means[0][:,i], self.weight_variances[0][:,i]), axis=1)
+            x_array = np.stack((x,np.zeros((x.shape[0], 1)),np.ones((x.shape[0],1))), axis=1) # Emulate a GM behsavior with mean=det, var=0 and weight=1
+            moments_pre = moments_pre_act_combined_general(x_array,w_array)
+            
+            self.pre_activation_moments_analytic[0][i,:] = moments_pre
 
             # Match the GM parameters to the moments
             means, variances, weights = match_moments_2(moments_pre, components = 2)
@@ -595,9 +603,16 @@ class GaussianMixtureNetwork():
             self.variances_gm_pre[0][i,:] = variances
             self.weights_gm_pre[0][i,:] = weights
 
+            print(f"Pre-Activation Mean: {self.pre_activation_moments_analytic[0][i,0]}")
+            print(f"Pre activation GM Means: {self.means_gm_pre[0][i,:]}")
+            print(f"Pre activation GM Variances: {self.variances_gm_pre[0][i,:]}")
+            print(f"Pre activation GM Weights: {self.weights_gm_pre[0][i,:]}")
+
             # Match Post-Activation
             # Compute moments of the post activation
             moments_post =  moments_post_act(self.a_relu, means, variances, weights)
+
+            self.post_activation_moments_analytic[0][i,:] = moments_post
 
             # Match the GM parameters to the moments
             means, variances, weights = match_moments_2(moments_post, components = 2)
@@ -619,7 +634,9 @@ class GaussianMixtureNetwork():
                 z_complete = np.concatenate((z_complete, np.zeros((1, 3, 2))), axis=0)
                 z_complete[-1, 0, 0] = 1 # Bias as fictive GM component with mean 1
                 w_complete = np.stack((self.weight_means[l][:,i], self.weight_variances[l][:,i]), axis=1)
-                moments_pre = moments_pre_act_combined(w_complete, z_complete)
+                moments_pre = moments_pre_act_combined_general(z_complete, w_complete)
+
+                self.pre_activation_moments_analytic[l][i,:] = moments_pre
 
                 # Match the GM parameters to the moments
                 means, variances, weights = match_moments_2(moments_pre, components = 2)
@@ -633,11 +650,15 @@ class GaussianMixtureNetwork():
                     # Compute moments of the post activation
                     moments_post =  moments_post_act(self.a_relu, means, variances, weights)
 
+                    self.post_activation_moments_analytic[l][i,:] = moments_post
+
                     # Match the GM parameters to the moments
                     means, variances, weights = match_moments_2(moments_post, components = 2)
                     
                 elif self.activations[l-1] == 'linear':
                     moments_post = moments_pre
+
+                    self.post_activation_moments_analytic[l][i,:] = moments_post
 
                 self.means_gm_post[l][i,:] = means
                 self.variances_gm_post[l][i,:] = variances
@@ -645,3 +666,87 @@ class GaussianMixtureNetwork():
 
         ######
         return self.means_gm_post[-1], self.variances_gm_post[-1], self.weights_gm_post[-1]
+
+    def forward_samples(self,x):
+        """
+        Forward pass through the network based on samples.
+        x: Input data, deterministic
+        """
+        # Generate sample representationj of every weight and prepare the intermediate sample values
+        self.sample_weights()
+
+        if isinstance(x,float) or isinstance(x,int):    
+            x = np.array([[x]])
+
+        assert len(x) == self.layers[0], f"Input data must have {self.layers[0]} features, but got {len(x)}"
+
+        # Augment Bias 
+        x = np.concatenate((x, np.ones((1, 1))), axis=0)
+
+        # Indexing a GM Parameter value is done by [layer][neuron,component]
+
+        ######
+        # Handle the first layer seperately as it uses deterministic input
+        ######
+        # Note: I assume that thr first ectivation is ReLU
+        # Iterate over the neurons in the first layer
+        for i in range(self.layers[1]):
+            # Compute pre avtivation 
+            # pre_act_samples shape: (verif_samples,)
+            pre_act_samples = np.dot(x.squeeze(), self.weight_samples[0][:, :, i].T)
+
+            print(f"Pre-Activation sample mean: {np.mean(pre_act_samples)}")
+            print(f"Pre-Activation sample variance: {np.var(pre_act_samples)}")
+
+            # Compute the empirical moments of the sample set
+            moments = np.zeros(10)
+            for order in range(1, 11):
+                moments[order-1] = np.mean(pre_act_samples**order)
+
+            self.pre_activation_moments_samples[0][i, :] = moments
+
+            post_act_samples = self.activation_functions[0](pre_act_samples)
+
+            # Compute the empirical moments of the sample set
+            moments = np.zeros(10)
+            for order in range(1, 11):
+                moments[order-1] = np.mean(post_act_samples**order)
+
+            self.post_activation_moments_samples[0][i, :] = moments
+
+            # Store the samples in the post activation sample container
+            self.post_activation_samples[0][:, i] = post_act_samples
+
+
+        ######
+        # Iterate over the rest of the layers
+        # I need to handle the bias term seperately as it is (Gauss x Deterministic)
+        ######
+        for l in range(1, len(self.layers)-1):
+            # Compute pre avtivation 
+            # pre_act_samples shape: (verif_samples,neurons)
+            pre_act_samples = np.einsum('bi,bij->bj', self.post_activation_samples[l-1], self.weight_samples[l])
+
+            # Compute the empirical moments of the sample set
+            for i in range(self.layers[l+1]):
+                moments = np.zeros(10)
+                for order in range(1, 11):
+                    moments[order-1] = np.mean(pre_act_samples[:,i]**order)
+
+                self.pre_activation_moments_samples[l][i, :] = moments
+
+            post_act_samples = self.activation_functions[l](pre_act_samples)
+
+            # Compute the empirical moments of the sample set
+            for i in range(self.layers[l+1]):
+                moments = np.zeros(10)
+                for order in range(1, 11):
+                    moments[order-1] = np.mean(post_act_samples[:,i]**order)
+
+            self.post_activation_moments_samples[l][i, :] = moments
+
+
+            self.post_activation_samples[l] = post_act_samples
+
+        ######
+        return self.post_activation_samples[-1]
