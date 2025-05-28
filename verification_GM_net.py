@@ -3,20 +3,25 @@
 # Author: Leon Winheim
 # Date: 22.05.2025
 ###########################################################################
-
+print("Startet")
 import numpy as np
+print("Numpy")
 import matplotlib.pyplot as plt
+print("Matplotlib")
 import GaussianMixtureNetwork as GMN
+print("GaussianMixtureNetwork")
 from sklearn.mixture import GaussianMixture
 import seaborn as sns
 import time
+
+print("Rennt..")
 
 # Flags to chose what to do
 verify_pre_act = False
 verify_post_act = False
 verify_moment_matching = False
-verify_network = False
-verify_moment_spike = True
+verify_network = True
+verify_moment_spike = False
 
 # Control variables
 np.random.seed(4)  # Set seed for reproducibility
@@ -208,8 +213,8 @@ if verify_moment_matching:
 if verify_network:
     layers = [1,5,1]
     act_func = ['relu','linear']
-    gm_comp_pre = 3
-    gm_comp_post = 3
+    gm_comp_pre = 1
+    gm_comp_post = 1
 
     print("Initializing model...")
     model = GMN.GaussianMixtureNetwork(layers,act_func,gm_comp_pre,gm_comp_post,0.05)
