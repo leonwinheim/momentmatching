@@ -188,6 +188,7 @@ def generate_k_tuples(n, m):
 
 def moments_pre_act_combined_general(z:np.ndarray,w:np.ndarray):
     """ This function computes the first ten moments of the pre activation value for a single neuron with multiple products input and weight.
+        The nature of this computation is a multinomial expansion.
 
         z is an array containing the the input values. Every row is a different GM with [[mu1,mu2...muN],[c1,c2...cN],[w1,w2...wN]] and resembles one neuronal output from before
         w is an array containing tuples of the form (mu_w, c_w) for every entry representing the weight as independent Gaussian
@@ -195,7 +196,7 @@ def moments_pre_act_combined_general(z:np.ndarray,w:np.ndarray):
         returns an array of the first ten moments of the pre activation value
     """
 
-    number_moments = 10 #If we want to change this, we need to add more moments to the functions above
+    number_moments = 10    #If we want to change this, we need to add more moments to the functions above
 
     # In general, x_array could be a gaussian mixture or deterministic. 
     # If it is deterministic, it will be the value as the first mean, 1 as the first weight and all other values in the GM specification will be zero
@@ -468,7 +469,7 @@ def match_moments_special(in_mom,components,solver="trust-constr"):
     return mu_res, c_res, w_res
 
 def match_moments_2_special(in_mom, components):
-    """Intermediate solution, only for two components"""
+    """Intermediate solution, only for two components with fixed Peak at 0"""
     if components != 2:
         raise ValueError("This function only works for two components")
     
@@ -486,7 +487,6 @@ def match_moments_2_special(in_mom, components):
     c_res = [result.x[2], result.x[3]]
 
     return np.array(mu_res), np.array(c_res), np.array(w_res)
-
 
 def residuals_matching_n(params, *args):
     """
@@ -537,6 +537,7 @@ def residuals_matching_2(params, *args):
     """
         Compute the residual value for the optimization process.
         Returns the array of indivudal residuals for each moment.
+        This is for two component only
     """
     # Unpack the arguments
     t = []
@@ -575,6 +576,7 @@ def residuals_matching_2_special(params, *args):
     """
         Compute the residual value for the optimization process.
         Returns the array of indivudal residuals for each moment.
+        This is for two component with special treatment regarding fixed peak
     """
     # Unpack the arguments [w0, mu1, c0, c1]
     t = []
@@ -602,10 +604,14 @@ def residuals_matching_2_special(params, *args):
     gm_moments[8] = e9_gm(w, mu, c)
     gm_moments[9] = e10_gm(w, mu, c)
 
+    #Additional weighting of the residuals
+    t_sub = np.array([10,5,2,1,1,1,1,1,1,1])    #Subjective weighting of the residuals
+    #t_sub = np.array([1,1,1,1,1,1,1,1,1,1])    # Equal weighting of the residuals
+
     # Compute the weighted residuals
     residuals = np.zeros(10, dtype=float)
     for i in range(10):
-        residuals[i] = abs(gm_moments[i] - t[i])/t[i]
+        residuals[i] = t_sub[i]*abs(gm_moments[i] - t[i])/t[i]
 
     # This should return an array
     return residuals
@@ -615,7 +621,7 @@ def residuals_matching_2_special(params, *args):
 
 class GaussianMixtureNetwork():
     """
-    Class to build a Gaussian Mixture based BNN. Numpy-Based
+    Bayesian Neural Network based on Gaussian weights and Gaussian Mixture intermediate approximations, based on higher order moment matching.
     """
     def __init__(self,layers:list,activations:list,components_pre:int,components_post:int,a_relu:float=0.01):
         """
@@ -695,7 +701,7 @@ class GaussianMixtureNetwork():
             self.post_activation_moments_analytic.append(samples)
 
     def sample_weights(self):
-        """Generate samples of every weight and bias in the network"""
+        """Generate samples of every weight and bias in the network, mainly needed for verification"""
         # Generate weight samples
         self.weight_samples = []
         # Iterate through layers
@@ -749,7 +755,7 @@ class GaussianMixtureNetwork():
             self.post_activation_moments_samples.append(samples)
         
     def set_act_func(self):
-        """Set the activation functions for the network"""
+        """Set the activation functions for the network from string to handle"""
         # Initialize the activation functions
         self.activation_functions = []
         for i in range(len(self.layers)-1):
@@ -768,7 +774,7 @@ class GaussianMixtureNetwork():
         return np.where(x > 0, x, a * x)
     
     def linear(self, x, return_name=False):  
-        """Linear activation function"""
+        """Linear activation function wioth slope 1"""
         if return_name:
             return "linear"
         return x
@@ -787,7 +793,7 @@ class GaussianMixtureNetwork():
 
     def compare_sample_moments_forward(self,x):
         """Makes a forward pass in both implemented methods and compares the moments"""
-        print("VERIFICATION")
+        print("---VERIFICATION---")
         print()
         start = time.time()
         result = self.forward_samples(x)
@@ -814,59 +820,54 @@ class GaussianMixtureNetwork():
         Forward pass through the network based on the method of moments.
         x: Input data, deterministic
         """
+        # Handle scalar input in case it is given as a float or int
         if isinstance(x,float) or isinstance(x,int):    
             x = np.array([[x]])
 
         assert len(x) == self.layers[0], f"Input data must have {self.layers[0]} features, but got {len(x)}"
 
-        # Augment Bias 
+        # Augment Bias for the input layer
         x = np.concatenate((x, np.ones((1, 1))), axis=0)
 
         # Indexing a GM Parameter value is done by [layer][neuron,component]
 
         ######
-        # Handle the first layer seperately as it uses deterministic input
+        # Handle the first layer seperately as it uses deterministic input (This could be changed and generalized)
         ######
-        # Note: I assume that thr first ectivation is ReLU
+        # Note: I assume that the first ectivation is ReLU
         # Iterate over the neurons in the first layer
         for i in range(self.layers[1]):
-            # Match Pre-Activation
-            # Compute moments of the pre activation (Weights for one neuron are one column of the weight matrix)
+            # PRE ACTIVATION
             w_array = np.stack((self.weight_means[0][:,i], self.weight_variances[0][:,i]), axis=1)
             x_array = np.stack((x,np.zeros((x.shape[0], 1)),np.ones((x.shape[0],1))), axis=1) # Emulate a GM behsavior with mean=det, var=0 and weight=1
+            # Compute Pre-Activation moments
             moments_pre = moments_pre_act_combined_general(x_array,w_array)
-            
             self.pre_activation_moments_analytic[0][i,:] = moments_pre
 
             # Match the GM parameters to the moments
             means, variances, weights = match_moments(moments_pre, components = self.components_pre)
-
             self.means_gm_pre[0][i,:] = means
             self.variances_gm_pre[0][i,:] = variances
             self.weights_gm_pre[0][i,:] = weights
 
-            # Match Post-Activation
+            # POST ACTIVATION
             # Compute moments of the post activation
             moments_post =  moments_post_act(self.a_relu, means, variances, weights)
-
             self.post_activation_moments_analytic[0][i,:] = moments_post
 
             # Match the GM parameters to the moments
             means, variances, weights = match_moments(moments_post, components = self.components_post)
-
             self.means_gm_post[0][i,:] = means
             self.variances_gm_post[0][i,:] = variances
             self.weights_gm_post[0][i,:] = weights
 
         ######
         # Iterate over the rest of the layers
-        # I need to handle the bias term seperately as it is (Gauss x Deterministic)
         ######
         for l in range(1, len(self.layers)-1):
             # Iterate over the neurons in the next layer
             for i in range(0,self.layers[l+1]):
-                # Match Pre-Activation
-                # Compute moments of the pre activation. This takes the weights as Gaussians and the previous layer output as GM, except for the bias neuron
+                # PRE ACTIVATION
                 # Augment the Bias neuron and assemble the parameter list
                 z_complete = np.stack((self.means_gm_post[l-1][:, :], self.variances_gm_post[l-1][:, :], self.weights_gm_post[l-1][:, :]),axis=1)
                 z_complete = np.concatenate((z_complete, np.zeros((1, 3, self.components_post))), axis=0)
@@ -874,22 +875,21 @@ class GaussianMixtureNetwork():
                 z_complete[-1, 1, 0] = 0 # and variance 0
                 z_complete[-1, 2, 0] = 1 # and weight 1
                 w_complete = np.stack((self.weight_means[l][:,i], self.weight_variances[l][:,i]), axis=1)
-                moments_pre = moments_pre_act_combined_general(z_complete, w_complete)
 
+                #Compute Pre-Activation moments
+                moments_pre = moments_pre_act_combined_general(z_complete, w_complete)
                 self.pre_activation_moments_analytic[l][i,:] = moments_pre
 
                 # Match the GM parameters to the moments
                 means, variances, weights = match_moments(moments_pre, components = self.components_pre)
-
                 self.means_gm_pre[l][i,:] = means
                 self.variances_gm_pre[l][i,:] = variances
                 self.weights_gm_pre[l][i,:] = weights
 
-                # Match Post-Activation
+                # POST ACTIVATION
                 if self.activations[l] == 'relu':
                     # Compute moments of the post activation
                     moments_post =  moments_post_act(self.a_relu, means, variances, weights)
-
                     self.post_activation_moments_analytic[l][i,:] = moments_post
 
                     # Match the GM parameters to the moments
@@ -899,8 +899,8 @@ class GaussianMixtureNetwork():
                     self.weights_gm_post[l][i,:] = weights
                     
                 elif self.activations[l] == 'linear':
+                    # Just take the pre moments as the transformation is linear with slope 1
                     moments_post = moments_pre
-
                     self.post_activation_moments_analytic[l][i,:] = moments_post    
 
                     # Match the GM parameters to the moments
@@ -933,7 +933,7 @@ class GaussianMixtureNetwork():
         ######
         # Handle the first layer seperately as it uses deterministic input
         ######
-        # Note: I assume that thr first ectivation is ReLU
+        # Note: I assume that the first ectivation is ReLU
         # Iterate over the neurons in the first layer
         for i in range(self.layers[1]):
             # Compute pre avtivation 

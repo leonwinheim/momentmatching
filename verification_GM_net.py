@@ -15,7 +15,8 @@ import time
 verify_pre_act = False
 verify_post_act = False
 verify_moment_matching = False
-verify_network = True
+verify_network = False
+verify_moment_spike = True
 
 # Control variables
 np.random.seed(4)  # Set seed for reproducibility
@@ -205,10 +206,10 @@ if verify_moment_matching:
     plt.savefig("kde.png")
 
 if verify_network:
-    layers = [1,5,2,5,1]
-    act_func = ['relu','relu','relu','linear']
-    gm_comp_pre = 2
-    gm_comp_post =2
+    layers = [1,5,1]
+    act_func = ['relu','linear']
+    gm_comp_pre = 3
+    gm_comp_post = 3
 
     print("Initializing model...")
     model = GMN.GaussianMixtureNetwork(layers,act_func,gm_comp_pre,gm_comp_post,0.05)
@@ -232,20 +233,28 @@ if verify_network:
     fig, axes = plt.subplots(
         ncols=(len(layers)-1)*2, 
         nrows=max(layers), 
-        figsize=(8*max(layers), 3*(len(layers)-1))  # Broadened width from 4* to 8*
+        figsize=(8*max(layers), 6*(len(layers)-1))  # Broadened width from 4* to 8*
     )
     for layer in range(len(layers)-1):
         for neuron in range(layers[layer+1]):
             print(f"***Layer {layer}, Neuron {neuron}***")
             # Pre Activation
             # Make the sample kde
-            sns.kdeplot(
-                model.pre_activation_samples[layer][:, neuron], 
-                ax=axes[neuron, layer*2], 
-                fill=True, 
-                label='Sampled',
+            # sns.kdeplot(
+            #     model.pre_activation_samples[layer][:, neuron], 
+            #     ax=axes[neuron, layer*2], 
+            #     fill=True, 
+            #     label='Sampled',
+            #     color='blue',
+            #     bw_adjust=kde_bw_adjust
+            # )
+            axes[neuron, layer*2].hist(
+                model.pre_activation_samples[layer][:, neuron],
+                bins=50,
+                density=True,
+                alpha=0.6,
                 color='blue',
-                bw_adjust=kde_bw_adjust
+                label='Sampled'
             )
             # Add a vertical line at the sample mean
             sample_mean = np.mean(model.pre_activation_samples[layer][:, neuron])
@@ -266,13 +275,21 @@ if verify_network:
 
             gm_samples = gm.sample(num_samples)[0].flatten()
 
-            sns.kdeplot(
-                gm_samples, 
-                ax=axes[neuron, layer*2], 
-                fill=True, 
-                label='GM',
+            # sns.kdeplot(
+            #     gm_samples, 
+            #     ax=axes[neuron, layer*2], 
+            #     fill=True, 
+            #     label='GM',
+            #     color='orange',
+            #     bw_adjust=kde_bw_adjust
+            # )
+            axes[neuron, layer*2].hist(
+                gm_samples,
+                bins=50,
+                density=True,
+                alpha=0.6,
                 color='orange',
-                bw_adjust=kde_bw_adjust
+                label='GM'
             )
             # Add a vertical line at the GM mean
             gm_mean = np.mean(gm_samples)
@@ -291,13 +308,21 @@ if verify_network:
             axes[neuron, layer*2].set_title(f'L {layer} N {neuron} Pre-Act')
             # Post Activation
             # Make the sample kde
-            sns.kdeplot(
-                model.post_activation_samples[layer][:, neuron], 
-                ax=axes[neuron, layer*2+1], 
-                fill=True, 
-                label='Sampled',
+            # sns.kdeplot(
+            #     model.post_activation_samples[layer][:, neuron], 
+            #     ax=axes[neuron, layer*2+1], 
+            #     fill=True, 
+            #     label='Sampled',
+            #     color='blue',
+            #     bw_adjust=kde_bw_adjust
+            # )
+            axes[neuron, layer*2+1].hist(
+                model.post_activation_samples[layer][:, neuron],
+                bins=50,
+                density=True,
+                alpha=0.6,
                 color='blue',
-                bw_adjust=kde_bw_adjust
+                label='Sampled'
             )
             # Add a vertical line at the sample mean
             sample_mean = np.mean(model.post_activation_samples[layer][:, neuron])
@@ -319,13 +344,21 @@ if verify_network:
 
             gm_samples = gm.sample(num_samples)[0].flatten()
 
-            sns.kdeplot(
-                gm_samples, 
-                ax=axes[neuron, layer*2+1], 
-                fill=True, 
-                label='GM',
+            # sns.kdeplot(
+            #     gm_samples, 
+            #     ax=axes[neuron, layer*2+1], 
+            #     fill=True, 
+            #     label='GM',
+            #     color='orange',
+            #     bw_adjust=kde_bw_adjust
+            # )
+            axes[neuron, layer*2+1].hist(
+                gm_samples,
+                bins=50,
+                density=True,
+                alpha=0.6,
                 color='orange',
-                bw_adjust=kde_bw_adjust
+                label='GM'
             )
             # Add a vertical line at the GM mean
             gm_mean = np.mean(gm_samples)
@@ -350,3 +383,80 @@ if verify_network:
 
     plt.tight_layout()
     plt.savefig('figures/GMN_verification.png', dpi=300)
+
+if verify_moment_spike:
+    # Generate Samples from a Gaussian 
+    num_components = 3
+    num_samples = 1000000
+    mu = 0.0
+    sigma = 1.0
+    samples = np.random.normal(mu, sigma, num_samples)
+
+    # Propagate the samples through a leaky ReLU
+    alpha = 0.1
+    def leaky_relu(x, alpha=0.1):
+        return np.where(x > 0, x, alpha * x)
+    z_samples = leaky_relu(samples, alpha)
+
+    # Compute empirical moments of the samples up to order 10
+    empirical_moments = []
+    for i in range(1, 11):
+        empirical_moments.append(np.mean(z_samples ** i))
+
+    # Compute the analytic moments
+    analytic_moments = GMN.moments_post_act(alpha, np.array([[mu]]), np.array([[sigma**2]]), np.array([[1.0]]))
+
+    # Compute the relative error
+    rel_error = np.round(100 * (analytic_moments - empirical_moments) / empirical_moments, 2)
+    print()
+    print("******Verification of the analytic moment computation for leaky ReLU******")
+    for i in range(10):
+        print(f"Sampled: {empirical_moments[i]:.4f}, Analytic: {analytic_moments[i]:.4f}, Rel. Err.: {rel_error[i]:.4f} %")
+
+    # Fit the GM to the propagated Samples
+    mu_res, c_res, w_res = GMN.match_moments(analytic_moments, num_components)
+    print()
+    print("Resulting GM parameters")
+    print("Fitted means:", mu_res)
+    print("Fitted covariances:", c_res)
+    print("Fitted weights:", w_res)
+    moments = [GMN.e1_gm(w_res, mu_res, c_res),
+               GMN.e2_gm(w_res, mu_res, c_res),
+               GMN.e3_gm(w_res, mu_res, c_res),
+               GMN.e4_gm(w_res, mu_res, c_res),
+               GMN.e5_gm(w_res, mu_res, c_res),
+               GMN.e6_gm(w_res, mu_res, c_res),
+               GMN.e7_gm(w_res, mu_res, c_res),
+               GMN.e8_gm(w_res, mu_res, c_res),
+               GMN.e9_gm(w_res, mu_res, c_res),
+               GMN.e10_gm(w_res, mu_res, c_res)]
+
+    # Compute the relative error
+    rel_error_gm = np.round(100 * (moments - analytic_moments) / analytic_moments, 2)
+    print()
+    print("******Comparison of analytic vs. GM-fitted moments for leaky ReLU******")
+    for i in range(10):
+        print(f"Analytic: {analytic_moments[i]:.4f}, GM: {moments[i]:.4f}, Rel. Err.: {rel_error_gm[i]:.4f} %")
+
+    # Sample from a GM with the fitted parameters
+    gmm_fit = GaussianMixture(n_components=num_components)
+    gmm_fit.means_ = mu_res.reshape(-1, 1)
+    gmm_fit.covariances_ = c_res.reshape(-1, 1, 1)
+    gmm_fit.weights_ = w_res
+    X_fit = gmm_fit.sample(num_samples)[0]
+
+    # Make a kdeplot of the samples
+    plt.figure(figsize=(7, 5))
+    plt.title("Result of Moment matching")
+    #sns.kdeplot(X_fit.flatten(), fill=True, bw_adjust=0.5, color='blue', alpha=0.5, label='GM Samples')
+    #sns.kdeplot(z_samples.flatten(), fill=True, bw_adjust=0.5, color='green', alpha=0.5, label='Leaky ReLU Samples')
+    plt.hist(X_fit.flatten(), bins=100, density=True, color='blue', alpha=0.5, label='GM Samples')
+    plt.hist(z_samples.flatten(), bins=100, density=True, color='green', alpha=0.5, label='Leaky ReLU Samples')
+    plt.legend()
+    plt.xlabel("Value")
+    plt.ylabel("Freq")
+    plt.tight_layout()
+    plt.savefig('figures/moment_matching_3comp.png', dpi=300)
+
+
+    
