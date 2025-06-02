@@ -6,171 +6,39 @@
 import numpy as np
 from scipy.special import erf, erfc
 from scipy.optimize import least_squares, LinearConstraint, minimize, Bounds
-from math import factorial
+from math import factorial, comb
 import time
 
-# Noncentral moments of a Gaussian, parametrized with the covariance
-def  e1(mu):
-    return mu
-def  e2(mu,c_v):
-    return c_v + mu**2
-def  e3(mu,c_v):
-    return 3*c_v*mu+mu**3
-def  e4(mu,c_v):
-    return 3*c_v**2 + 6*c_v*mu**2 + mu**4
-def  e5(mu,c_v):
-    return 15*c_v**2*mu + 10*c_v*mu**3 + mu**5
-def e6(mu, c_v):
-    return 15*c_v**3 + 45*c_v**2*mu**2 + 15*c_v*mu**4 + mu**6
-def e7(mu, c_v):
-    return 105*mu*(c_v**3)+105*(c_v**2)*(mu**3)+21*(mu**5)*c_v+mu**7
-def e8(mu, c_v):    
-    return 105*c_v**4+420*(c_v**3)*(mu**2)+210*(c_v**2)*(mu**4)+28*(c_v)*(mu**6)+mu**8
-def e9(mu, c_v):
-    return 945*(c_v**4)*mu+1260*(c_v**3)*(mu**3)+378*(c_v**2)*(mu**5)+36*c_v*(mu**7)+mu**9
-def e10(mu, c_v):
-    return 945*c_v**5+4725*(c_v**4)*(mu**2)+3150*(c_v**3)*(mu**4)+630*(c_v**2)*(mu**6)+45*(c_v)*mu**8+mu**10
-def e11(mu, c_v):
-    return 10395*c_v**5*mu + 17325*c_v**4*mu**3 + 6930*c_v**3*mu**5 + 990*c_v**2*mu**7 + 55*c_v*mu**9 + mu**11
-def e12(mu, c_v):
-    return 10395*c_v**6 + 62370*c_v**5*mu**2 + 51975*c_v**4*mu**4 + 13860*c_v**3*mu**6 + 1485*c_v**2*mu**8 + 66*c_v*mu**10 + mu**12
-def e13(mu, c_v):
-    return 135135*c_v**6*mu + 270270*c_v**5*mu**3 + 135135*c_v**4*mu**5 + 25740*c_v**3*mu**7 + 2145*c_v**2*mu**9 + 78*c_v*mu**11 + mu**13
-def e14(mu, c_v):
-    return 135135*c_v**7 + 945945*c_v**6*mu**2 + 945945*c_v**5*mu**4 + 315315*c_v**4*mu**6 + 45045*c_v**3*mu**8 + 3003*c_v**2*mu**10 + 91*c_v*mu**12 + mu**14
-def e15(mu, c_v):
-    return 2027025*c_v**7*mu + 4729725*c_v**6*mu**3 + 2837835*c_v**5*mu**5 + 675675*c_v**4*mu**7 + 75075*c_v**3*mu**9 + 4095*c_v**2*mu**11 + 105*c_v*mu**13 + mu**15
-def e16(mu, c_v):
-    return 2027025*c_v**8 + 16216200*c_v**7*mu**2 + 18918900*c_v**6*mu**4 + 7567560*c_v**5*mu**6 + 1351350*c_v**4*mu**8 + 120120*c_v**3*mu**10 + 5460*c_v**2*mu**12 + 120*c_v*mu**14 + mu**16
-def e17(mu, c_v):
-    return 34459425*c_v**8*mu + 91891800*c_v**7*mu**3 + 64324260*c_v**6*mu**5 + 18378360*c_v**5*mu**7 + 2552550*c_v**4*mu**9 + 185640*c_v**3*mu**11 + 7140*c_v**2*mu**13 + 136*c_v*mu**15 + mu**17
-def e18(mu, c_v):
-    return 34459425*c_v**9 + 310134825*c_v**8*mu**2 + 413513100*c_v**7*mu**4 + 192972780*c_v**6*mu**6 + 41351310*c_v**5*mu**8 + 4594590*c_v**4*mu**10 + 278460*c_v**3*mu**12 + 9180*c_v**2*mu**14 + 153*c_v*mu**16 + mu**18
-def e19(mu, c_v):
-    return 654729075*c_v**9*mu + 1964187225*c_v**8*mu**3 + 1571349780*c_v**7*mu**5 + 523783260*c_v**6*mu**7 + 87297210*c_v**5*mu**9 + 7936110*c_v**4*mu**11 + 406980*c_v**3*mu**13 + 11628*c_v**2*mu**15 + 171*c_v*mu**17 + mu**19
-def e20(mu, c_v):
-    return 654729075*c_v**10 + 6547290750*c_v**9*mu**2 + 9820936125*c_v**8*mu**4 + 5237832600*c_v**7*mu**6 + 1309458150*c_v**6*mu**8 + 174594420*c_v**5*mu**10 + 13226850*c_v**4*mu**12 + 581400*c_v**3*mu**14 + 14535*c_v**2*mu**16 + 190*c_v*mu**18 + mu**20
+# Noncentral moments of a Gaussian, flexible
+def double_factorial(n):
+    """Compute the double factorial n!!"""
+    if n <= 0:
+        return 1
+    result = 1
+    while n > 1:
+        result *= n
+        n -= 2
+    return result
 
-# Noncentral moments of a Gaussian Mixture for arbitrary many components
-def e1_gm(w: np.array, mu: np.array, c: np.array):
-    e1_gm = 0
-    for i in range(len(w)):
-        e1_gm += w[i] * e1(mu[i])
-    return e1_gm
+def gaussian_noncentral_moment(n, mu, c):
+    """Compute the n-th noncentral moment of a Gaussian"""
+    # Compute stadderd deviation and initialize moment
+    sigma = np.sqrt(c)
+    moment = 0
+    for k in range(n // 2 + 1):
+        coeff = comb(n, 2 * k)
+        dfact = double_factorial(2 * k - 1)
+        term = coeff * dfact * (sigma ** (2 * k)) * (mu ** (n - 2 * k))
+        moment += term
+    return moment
 
-def e2_gm(w: np.array, mu: np.array, c: np.array):
-    e2_gm = 0
+# Noncentral moments of a Gaussian MIxture for arbitrary many components and order
+def gm_noncentral_moment(n, w, mu, c):
+    """Compute the n-th noncentral moment of a Gaussian Mixture"""
+    moment = 0
     for i in range(len(w)):
-        e2_gm += w[i] * e2(mu[i], c[i])
-    return e2_gm
-
-def e3_gm(w: np.array, mu: np.array, c: np.array):
-    e3_gm = 0
-    for i in range(len(w)):
-        e3_gm += w[i] * e3(mu[i], c[i])
-    return e3_gm
-
-def e4_gm(w: np.array, mu: np.array, c: np.array):
-    e4_gm = 0
-    for i in range(len(w)):
-        e4_gm += w[i] * e4(mu[i], c[i])
-    return e4_gm
-
-def e5_gm(w: np.array, mu: np.array, c: np.array):
-    e5_gm = 0
-    for i in range(len(w)):
-        e5_gm += w[i] * e5(mu[i], c[i])
-    return e5_gm
-
-def e6_gm(w: np.array, mu: np.array, c: np.array):
-    e6_gm = 0
-    for i in range(len(w)):
-        e6_gm += w[i] * e6(mu[i], c[i])
-    return e6_gm
-
-def e7_gm(w: np.array, mu: np.array, c: np.array):
-    e7_gm = 0
-    for i in range(len(w)):
-        e7_gm += w[i] * e7(mu[i], c[i])
-    return e7_gm
-
-def e8_gm(w: np.array, mu: np.array, c: np.array):
-    e8_gm = 0
-    for i in range(len(w)):
-        e8_gm += w[i] * e8(mu[i], c[i])
-    return e8_gm
-
-def e9_gm(w: np.array, mu: np.array, c: np.array):
-    e9_gm = 0
-    for i in range(len(w)):
-        e9_gm += w[i] * e9(mu[i], c[i])
-    return e9_gm
-
-def e10_gm(w: np.array, mu: np.array, c: np.array):
-    e10_gm = 0
-    for i in range(len(w)):
-        e10_gm += w[i] * e10(mu[i], c[i])
-    return e10_gm
-
-def e11_gm(w: np.array, mu: np.array, c: np.array):
-    e11_gm = 0
-    for i in range(len(w)):
-        e11_gm += w[i] * e11(mu[i], c[i])
-    return e11_gm
-
-def e12_gm(w: np.array, mu: np.array, c: np.array):
-    e12_gm = 0
-    for i in range(len(w)):
-        e12_gm += w[i] * e12(mu[i], c[i])
-    return e12_gm
-
-def e13_gm(w: np.array, mu: np.array, c: np.array):
-    e13_gm = 0
-    for i in range(len(w)):
-        e13_gm += w[i] * e13(mu[i], c[i])
-    return e13_gm
-
-def e14_gm(w: np.array, mu: np.array, c: np.array):
-    e14_gm = 0
-    for i in range(len(w)):
-        e14_gm += w[i] * e14(mu[i], c[i])
-    return e14_gm
-
-def e15_gm(w: np.array, mu: np.array, c: np.array):
-    e15_gm = 0
-    for i in range(len(w)):
-        e15_gm += w[i] * e15(mu[i], c[i])
-    return e15_gm
-
-def e16_gm(w: np.array, mu: np.array, c: np.array):
-    e16_gm = 0
-    for i in range(len(w)):
-        e16_gm += w[i] * e16(mu[i], c[i])
-    return e16_gm
-
-def e17_gm(w: np.array, mu: np.array, c: np.array):
-    e17_gm = 0
-    for i in range(len(w)):
-        e17_gm += w[i] * e17(mu[i], c[i])
-    return e17_gm
-
-def e18_gm(w: np.array, mu: np.array, c: np.array):
-    e18_gm = 0
-    for i in range(len(w)):
-        e18_gm += w[i] * e18(mu[i], c[i])
-    return e18_gm
-
-def e19_gm(w: np.array, mu: np.array, c: np.array):
-    e19_gm = 0
-    for i in range(len(w)):
-        e19_gm += w[i] * e19(mu[i], c[i])
-    return e19_gm
-
-def e20_gm(w: np.array, mu: np.array, c: np.array):
-    e20_gm = 0
-    for i in range(len(w)):
-        e20_gm += w[i] * e20(mu[i], c[i])
-    return e20_gm
+        moment += w[i] * gaussian_noncentral_moment(n, mu[i], c[i])
+    return moment
 
 # Next generation of functions
 def generate_k_tuples(n, m):
@@ -186,17 +54,18 @@ def generate_k_tuples(n, m):
             for tail in generate_k_tuples(n - i, m - 1):
                 yield (i,) + tail
 
-def moments_pre_act_combined_general(z:np.ndarray,w:np.ndarray):
+def moments_pre_act_combined_general(z:np.ndarray,w:np.ndarray,order:int=10):
     """ This function computes the first ten moments of the pre activation value for a single neuron with multiple products input and weight.
         The nature of this computation is a multinomial expansion.
 
         z is an array containing the the input values. Every row is a different GM with [[mu1,mu2...muN],[c1,c2...cN],[w1,w2...wN]] and resembles one neuronal output from before
         w is an array containing tuples of the form (mu_w, c_w) for every entry representing the weight as independent Gaussian
-
+        order is the number of moments to compute (default is 10)
+        
         returns an array of the first ten moments of the pre activation value
     """
 
-    number_moments = 10    #If we want to change this, we need to add more moments to the functions above
+    number_moments = order    #If we want to change this, we need to add more moments to the functions above
 
     # In general, x_array could be a gaussian mixture or deterministic. 
     # If it is deterministic, it will be the value as the first mean, 1 as the first weight and all other values in the GM specification will be zero
@@ -208,15 +77,18 @@ def moments_pre_act_combined_general(z:np.ndarray,w:np.ndarray):
     for i in range(w.shape[0]):
         mu_w, c_w = w[i]
         # Save the moments, augment a 0 moment to avoid indexing issues with the multinomial indexing
-        moments_w[i] = [1 ,e1(mu_w), e2(mu_w, c_w), e3(mu_w, c_w), e4(mu_w, c_w), e5(mu_w, c_w), e6(mu_w, c_w), e7(mu_w, c_w), e8(mu_w, c_w), e9(mu_w, c_w), e10(mu_w, c_w)]
-
+        moments_w[i][0] = 1  
+        for j in range(1,number_moments+1):
+            moments_w[i][j] = gaussian_noncentral_moment(j, mu_w, c_w)
     # Pre-Compute the Moments of each z (z could be Deterministic or GM, but the gm-moment-generation will handle this flexible)
     moments_z = np.zeros((len(z), number_moments+1))
     for i in range(z.shape[0]):
         # mu, c and w are potentially multi-component GMs
         mu_z, c_z, w_z = z[i]
         # Save the moments, augment a 0 moment to avoid indexing issues with the multinomial indexing
-        moments_z[i] = [1 ,e1_gm(w_z, mu_z, c_z), e2_gm(w_z, mu_z, c_z), e3_gm(w_z, mu_z, c_z), e4_gm(w_z, mu_z, c_z), e5_gm(w_z, mu_z, c_z), e6_gm(w_z, mu_z, c_z), e7_gm(w_z, mu_z, c_z), e8_gm(w_z, mu_z, c_z), e9_gm(w_z, mu_z, c_z), e10_gm(w_z, mu_z, c_z)]
+        moments_z[i][0] = 1
+        for j in range(1,number_moments+1):
+            moments_z[i][j] = gm_noncentral_moment(j, w_z, mu_z, c_z)
 
     # Initialize result vector 
     result = np.zeros(number_moments)
@@ -240,23 +112,25 @@ def moments_pre_act_combined_general(z:np.ndarray,w:np.ndarray):
             result[i-1] += multinom_coeff * expectation_product
     return result
 
-def moments_post_act(a:float,mu:np.ndarray,c:np.ndarray,w:np.ndarray):
+def moments_post_act(a:float,mu:np.ndarray,c:np.ndarray,w:np.ndarray,order:int=10): 
     """This function computes the post activation moments of a Gaussian mixture with arbitrary many components propagated through leaky relu
     
         a: slope of the leaky relu
         mu: mean vector of the Gaussian Mixture
         c: variance array of the Gaussian Mixture
         w: weights of the Gaussian Mixture
+        order: the number of moments to compute (default is 10)
 
         returns the first ten moments of the post activation distribution
     """
     assert np.max(c) >= 0.01, "Variance must be big enough"
-    num_moments = 10
+
+    num_moments = order
     assert len(mu) == len(c) == len(w), "mu, c, and w must have the same length"
     sigma = np.sqrt(c)
 
     # Initialize result vector 
-    result = np.zeros(num_moments, dtype=float)
+    result = np.zeros(10, dtype=float)
 
     # Iterate over components of the GM
     for i in range(len(mu)):
@@ -271,7 +145,7 @@ def moments_post_act(a:float,mu:np.ndarray,c:np.ndarray,w:np.ndarray):
         result[8] += ((sigma[i]*(mu[i]**8 + 35*mu[i]**6*sigma[i]**2 + 345*mu[i]**4*sigma[i]**4 + 975*mu[i]**2*sigma[i]**6 + 384*sigma[i]**8))/(np.exp(mu[i]**2/(2*sigma[i]**2))*np.sqrt(2*np.pi))- (a**9*sigma[i]*(mu[i]**8 + 35*mu[i]**6*sigma[i]**2 + 345*mu[i]**4*sigma[i]**4 + 975*mu[i]**2*sigma[i]**6 + 384*sigma[i]**8))/(np.exp(mu[i]**2/(2*sigma[i]**2))*np.sqrt(2*np.pi))+ ((1 + erf(mu[i]/(np.sqrt(2)*sigma[i])))*mu[i]*(mu[i]**8 + 36*mu[i]**6*sigma[i]**2 + 378*mu[i]**4*sigma[i]**4 + 1260*mu[i]**2*sigma[i]**6 + 945*sigma[i]**8))/2+ (a**9*erfc(mu[i]/(np.sqrt(2)*sigma[i]))*mu[i]*(mu[i]**8 + 36*mu[i]**6*sigma[i]**2 + 378*mu[i]**4*sigma[i]**4 + 1260*mu[i]**2*sigma[i]**6 + 945*sigma[i]**8))/2) * w[i]
         result[9] += w[i] * ((mu[i] * sigma[i] * (mu[i]**8 + 44 * mu[i]**6 * sigma[i]**2 + 588 * mu[i]**4 * sigma[i]**4 + 2640 * mu[i]**2 * sigma[i]**6 + 2895 * sigma[i]**8)) / (np.exp(mu[i]**2 / (2 * sigma[i]**2)) * np.sqrt(2 * np.pi))+ ((1 + erf(mu[i] / (np.sqrt(2) * sigma[i]))) * (mu[i]**10 + 45 * mu[i]**8 * sigma[i]**2 + 630 * mu[i]**6 * sigma[i]**4 + 3150 * mu[i]**4 * sigma[i]**6 + 4725 * mu[i]**2 * sigma[i]**8 + 945 * sigma[i]**10)) / 2+ (a**10 * (-np.sqrt(2 / np.pi) * mu[i] * sigma[i] * (mu[i]**8 + 44 * mu[i]**6 * sigma[i]**2 + 588 * mu[i]**4 * sigma[i]**4 + 2640 * mu[i]**2 * sigma[i]**6 + 2895 * sigma[i]**8) / np.exp(mu[i]**2 / (2 * sigma[i]**2)) + erfc(mu[i] / (np.sqrt(2) * sigma[i])) * (mu[i]**10 + 45 * mu[i]**8 * sigma[i]**2 + 630 * mu[i]**6 * sigma[i]**4 + 3150 * mu[i]**4 * sigma[i]**6 + 4725 * mu[i]**2 * sigma[i]**8 + 945 * sigma[i]**10)) / 2))
         
-    return result
+    return result[:num_moments]  # Return only the first 8 moments, as the last two are not needed for the network
 
 def match_moments(in_mom,components,solver="trust-constr"):
     """Function to perform the moment matching for given Moments and a desired number of components.
@@ -494,12 +368,13 @@ def residuals_matching_n(params, *args):
         Returns the array of indivudal residuals for each moment.
         This is for arbitrary component count
     """
-
     # Unpack the arguments
     t = []
     for temp in args:
         t.append(temp)
     t = np.array(t).squeeze()	
+
+    num_moments = len(t)  # Number of moments to match
 
     # Infer how many components we have
     components = int(len(params)/3)
@@ -510,21 +385,13 @@ def residuals_matching_n(params, *args):
     c = params[components*2:components*3]
 
     # Compute the moments of the Gaussian Mixture
-    gm_moments = np.zeros(10, dtype=float)
-    gm_moments[0] = e1_gm(w, mu, c)
-    gm_moments[1] = e2_gm(w, mu, c)
-    gm_moments[2] = e3_gm(w, mu, c)
-    gm_moments[3] = e4_gm(w, mu, c)
-    gm_moments[4] = e5_gm(w, mu, c)
-    gm_moments[5] = e6_gm(w, mu, c)
-    gm_moments[6] = e7_gm(w, mu, c)
-    gm_moments[7] = e8_gm(w, mu, c)
-    gm_moments[8] = e9_gm(w, mu, c)
-    gm_moments[9] = e10_gm(w, mu, c)
+    gm_moments = np.zeros(num_moments, dtype=float)
+    for i in range(num_moments):
+        gm_moments[i] = gm_noncentral_moment(i+1, w, mu, c)
 
     # Compute the weighted residuals
-    residuals = np.zeros(10, dtype=float)
-    for i in range(10):
+    residuals = np.zeros(num_moments, dtype=float)
+    for i in range(num_moments):
         residuals[i] = abs(gm_moments[i] - t[i])/t[i]
     
     # COmpute the summed squared residuals
@@ -539,10 +406,13 @@ def residuals_matching_2(params, *args):
         Returns the array of indivudal residuals for each moment.
         This is for two component only
     """
+
     # Unpack the arguments
     t = []
     for temp in args:
         t.append(temp)
+
+    num_moments = len(t)  # Number of moments to match
 
     # Infer how many components we have
     components = int(len(params)/3)
@@ -552,21 +422,13 @@ def residuals_matching_2(params, *args):
     c = params[3:5]
 
     # Compute the moments of the Gaussian Mixture
-    gm_moments = np.zeros(10, dtype=float)
-    gm_moments[0] = e1_gm(w, mu, c)
-    gm_moments[1] = e2_gm(w, mu, c)
-    gm_moments[2] = e3_gm(w, mu, c)
-    gm_moments[3] = e4_gm(w, mu, c)
-    gm_moments[4] = e5_gm(w, mu, c)
-    gm_moments[5] = e6_gm(w, mu, c)
-    gm_moments[6] = e7_gm(w, mu, c)
-    gm_moments[7] = e8_gm(w, mu, c)
-    gm_moments[8] = e9_gm(w, mu, c)
-    gm_moments[9] = e10_gm(w, mu, c)
+    gm_moments = np.zeros(num_moments, dtype=float)
+    for i in range(num_moments):
+        gm_moments[i] = gm_noncentral_moment(i+1, w, mu, c)
 
     # Compute the weighted residuals
-    residuals = np.zeros(10, dtype=float)
-    for i in range(10):
+    residuals = np.zeros(num_moments, dtype=float)
+    for i in range(num_moments):
         residuals[i] = abs(gm_moments[i] - t[i])/t[i]
 
     # This should return an array
@@ -584,6 +446,9 @@ def residuals_matching_2_special(params, *args):
         t.append(temp)
     t = np.array(t).squeeze()	
 
+    num_moments = len(t)  # Number of moments to match
+    assert num_moments == 10, "This function is only implemented for 10 moments because of the weighting"
+
     # Infer how many components we have
     components = int(len(params)/3)
     # Extract the parameters from the input vector
@@ -592,25 +457,17 @@ def residuals_matching_2_special(params, *args):
     c = np.array([params[2].squeeze(), params[3].squeeze()])
 
     # Compute the moments of the Gaussian Mixture
-    gm_moments = np.zeros(10, dtype=float)
-    gm_moments[0] = e1_gm(w, mu, c)
-    gm_moments[1] = e2_gm(w, mu, c)
-    gm_moments[2] = e3_gm(w, mu, c)
-    gm_moments[3] = e4_gm(w, mu, c)
-    gm_moments[4] = e5_gm(w, mu, c)
-    gm_moments[5] = e6_gm(w, mu, c)
-    gm_moments[6] = e7_gm(w, mu, c)
-    gm_moments[7] = e8_gm(w, mu, c)
-    gm_moments[8] = e9_gm(w, mu, c)
-    gm_moments[9] = e10_gm(w, mu, c)
+    gm_moments = np.zeros(num_moments, dtype=float)
+    for i in range(num_moments):
+        gm_moments[i] = gm_noncentral_moment(i+1, w, mu, c)
 
     #Additional weighting of the residuals
     t_sub = np.array([10,5,2,1,1,1,1,1,1,1])    #Subjective weighting of the residuals
     #t_sub = np.array([1,1,1,1,1,1,1,1,1,1])    # Equal weighting of the residuals
 
     # Compute the weighted residuals
-    residuals = np.zeros(10, dtype=float)
-    for i in range(10):
+    residuals = np.zeros(num_moments, dtype=float)
+    for i in range(num_moments):
         residuals[i] = t_sub[i]*abs(gm_moments[i] - t[i])/t[i]
 
     # This should return an array
@@ -623,7 +480,7 @@ class GaussianMixtureNetwork():
     """
     Bayesian Neural Network based on Gaussian weights and Gaussian Mixture intermediate approximations, based on higher order moment matching.
     """
-    def __init__(self,layers:list,activations:list,components_pre:int,components_post:int,a_relu:float=0.01):
+    def __init__(self,layers:list,activations:list,components_pre:int,components_post:int,moments_pre:int=10,moments_post:int=10,a_relu:float=0.01):
         """
         Initialize the Gaussian Mixture Network with the given parameters.
 
@@ -631,12 +488,16 @@ class GaussianMixtureNetwork():
         activations: List of activation functions for each layer. Contains one entry less than layers
         components_pre: Number of components for the pre-activation layer.
         components_post: Number of components for the post-activation layer.
+        moments_pre: Number of moments to use in matching for the pre-activation layer.
+        moments_post: Number of moments to use in matching for the post-activation layer.
         """
         # Add values to instance
         self.layers = layers
         self.activations = activations.copy()
         self.components_pre = components_pre
         self.components_post = components_post
+        self.moments_pre = moments_pre
+        self.moments_post = moments_post
         self.a_relu = a_relu
         self.verif_samples = 100000
 
@@ -688,7 +549,7 @@ class GaussianMixtureNetwork():
         self.pre_activation_moments_analytic = []
         # Iterate through layers
         for i in range(len(self.layers)-1):
-            samples = np.zeros((self.layers[i+1],10))
+            samples = np.zeros((self.layers[i+1],self.moments_pre))
 
             self.pre_activation_moments_analytic.append(samples)
         
@@ -696,7 +557,7 @@ class GaussianMixtureNetwork():
         self.post_activation_moments_analytic = []
         # Iterate through layers
         for i in range(len(self.layers)-1):
-            samples = np.zeros((self.layers[i+1],10))
+            samples = np.zeros((self.layers[i+1],self.moments_post))
 
             self.post_activation_moments_analytic.append(samples)
 
@@ -742,7 +603,7 @@ class GaussianMixtureNetwork():
         self.pre_activation_moments_samples = []
         # Iterate through layers
         for i in range(len(self.layers)-1):
-            samples = np.zeros((self.layers[i+1],10))
+            samples = np.zeros((self.layers[i+1],self.moments_pre))
 
             self.pre_activation_moments_samples.append(samples)
         
@@ -750,7 +611,7 @@ class GaussianMixtureNetwork():
         self.post_activation_moments_samples = []
         # Iterate through layers
         for i in range(len(self.layers)-1):
-            samples = np.zeros((self.layers[i+1],10))
+            samples = np.zeros((self.layers[i+1],self.moments_post))
 
             self.post_activation_moments_samples.append(samples)
         
@@ -787,8 +648,8 @@ class GaussianMixtureNetwork():
         for i in range(len(self.layers) - 1):
             act = self.activations[i] if i < len(self.activations) else "none"
             print(f" Layer {i}: {self.layers[i]} -> {self.layers[i+1]} neurons | Activation: {act}")
-        print(f" Pre-activation GM components: {self.components_pre}")
-        print(f" Post-activation GM components: {self.components_post}")
+        print(f" Pre-activation GM components: {self.components_pre}, matched with {self.moments_pre} moments")
+        print(f" Post-activation GM components: {self.components_post}, matched with {self.moments_post} moments")
         print(f" Leaky ReLU slope (a): {self.a_relu}")
 
     def compare_sample_moments_forward(self,x):
@@ -841,7 +702,7 @@ class GaussianMixtureNetwork():
             w_array = np.stack((self.weight_means[0][:,i], self.weight_variances[0][:,i]), axis=1)
             x_array = np.stack((x,np.zeros((x.shape[0], 1)),np.ones((x.shape[0],1))), axis=1) # Emulate a GM behsavior with mean=det, var=0 and weight=1
             # Compute Pre-Activation moments
-            moments_pre = moments_pre_act_combined_general(x_array,w_array)
+            moments_pre = moments_pre_act_combined_general(x_array,w_array,order=self.moments_pre)
             self.pre_activation_moments_analytic[0][i,:] = moments_pre
 
             # Match the GM parameters to the moments
@@ -852,7 +713,7 @@ class GaussianMixtureNetwork():
 
             # POST ACTIVATION
             # Compute moments of the post activation
-            moments_post =  moments_post_act(self.a_relu, means, variances, weights)
+            moments_post =  moments_post_act(self.a_relu, means, variances, weights,order=self.moments_post)
             self.post_activation_moments_analytic[0][i,:] = moments_post
 
             # Match the GM parameters to the moments
@@ -877,7 +738,7 @@ class GaussianMixtureNetwork():
                 w_complete = np.stack((self.weight_means[l][:,i], self.weight_variances[l][:,i]), axis=1)
 
                 #Compute Pre-Activation moments
-                moments_pre = moments_pre_act_combined_general(z_complete, w_complete)
+                moments_pre = moments_pre_act_combined_general(z_complete, w_complete,order=self.moments_pre)
                 self.pre_activation_moments_analytic[l][i,:] = moments_pre
 
                 # Match the GM parameters to the moments
@@ -889,7 +750,7 @@ class GaussianMixtureNetwork():
                 # POST ACTIVATION
                 if self.activations[l] == 'relu':
                     # Compute moments of the post activation
-                    moments_post =  moments_post_act(self.a_relu, means, variances, weights)
+                    moments_post =  moments_post_act(self.a_relu, means, variances, weights,order=self.moments_post)
                     self.post_activation_moments_analytic[l][i,:] = moments_post
 
                     # Match the GM parameters to the moments
@@ -944,8 +805,8 @@ class GaussianMixtureNetwork():
             self.pre_activation_samples[0][:, i] = pre_act_samples
 
             # Compute the empirical moments of the sample set
-            moments = np.zeros(10)
-            for order in range(1, 11):
+            moments = np.zeros(self.moments_pre)
+            for order in range(1, self.moments_pre+1):
                 moments[order-1] = np.mean(pre_act_samples**order)
 
             self.pre_activation_moments_samples[0][i, :] = moments
@@ -953,8 +814,8 @@ class GaussianMixtureNetwork():
             post_act_samples = self.activation_functions[0](pre_act_samples)
 
             # Compute the empirical moments of the sample set
-            moments = np.zeros(10)
-            for order in range(1, 11):
+            moments = np.zeros(self.moments_post)
+            for order in range(1, self.moments_post+1):
                 moments[order-1] = np.mean(post_act_samples**order)
 
             self.post_activation_moments_samples[0][i, :] = moments
@@ -978,8 +839,8 @@ class GaussianMixtureNetwork():
 
             # Compute the empirical moments of the sample set
             for i in range(self.layers[l+1]):
-                moments = np.zeros(10)
-                for order in range(1, 11):
+                moments = np.zeros(self.moments_pre)
+                for order in range(1, self.moments_pre+1):
                     moments[order-1] = np.mean(pre_act_samples[:,i]**order)
 
                 self.pre_activation_moments_samples[l][i, :] = moments
@@ -988,8 +849,8 @@ class GaussianMixtureNetwork():
 
             # Compute the empirical moments of the sample set
             for i in range(self.layers[l+1]):
-                moments = np.zeros(10)
-                for order in range(1, 11):
+                moments = np.zeros(self.moments_post)
+                for order in range(1, self.moments_post+1):
                     moments[order-1] = np.mean(post_act_samples[:,i]**order)
 
                 self.post_activation_moments_samples[l][i, :] = moments

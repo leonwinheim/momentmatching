@@ -22,6 +22,7 @@ verify_post_act = False
 verify_moment_matching = False
 verify_network = True
 verify_moment_spike = False
+verify_gauss_moment = True
 
 # Control variables
 np.random.seed(4)  # Set seed for reproducibility
@@ -211,13 +212,15 @@ if verify_moment_matching:
     plt.savefig("kde.png")
 
 if verify_network:
-    layers = [1,5,1]
-    act_func = ['relu','linear']
-    gm_comp_pre = 1
-    gm_comp_post = 1
+    layers = [1,5,5,1]
+    act_func = ['relu','relu','linear']
+    gm_comp_pre = 2
+    gm_comp_post = 2
+    moments_pre = 5
+    moments_post = 5
 
     print("Initializing model...")
-    model = GMN.GaussianMixtureNetwork(layers,act_func,gm_comp_pre,gm_comp_post,0.05)
+    model = GMN.GaussianMixtureNetwork(layers,act_func,gm_comp_pre,gm_comp_post,moments_pre,moments_post,0.05)
     print("Initialized model.")
     model.print_network()
     print()
@@ -462,6 +465,3 @@ if verify_moment_spike:
     plt.ylabel("Freq")
     plt.tight_layout()
     plt.savefig('figures/moment_matching_3comp.png', dpi=300)
-
-
-    
