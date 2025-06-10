@@ -8,6 +8,8 @@ from scipy.special import erf, erfc
 from scipy.optimize import least_squares, LinearConstraint, minimize, Bounds
 from math import factorial, comb
 import time
+from sklearn.mixture import GaussianMixture
+import itertools
 
 # Noncentral moments of a Gaussian, flexible
 def double_factorial(n):
@@ -112,6 +114,66 @@ def moments_pre_act_combined_general(z:np.ndarray,w:np.ndarray,order:int=10):
             result[i-1] += multinom_coeff * expectation_product
     return result
 
+def moments_pre_act_combined_general_peak(z:np.ndarray,w:np.ndarray,dirac:np.ndarray,order:int=10):
+    """ This function computes the first ten moments of the pre activation value for a single neuron with multiple products input and weight, and an additional dirac.
+        The nature of this computation is a multinomial expansion.
+
+        z is an array containing the the input values. Every row is a different GM with [[mu1,mu2...muN],[c1,c2...cN],[w1,w2...wN]] and resembles one neuronal output from before
+        w is an array containing tuples of the form (mu_w, c_w) for every entry representing the weight as independent Gaussian
+        order is the number of moments to compute (default is 10)
+        
+        returns an array of the first ten moments of the pre activation value
+    """
+    #raise ValueError("Wie baue ich den Dirac da ein?")
+    number_moments = order    #If we want to change this, we need to add more moments to the functions above
+
+    # In general, x_array could be a gaussian mixture or deterministic. 
+    # If it is deterministic, it will be the value as the first mean, 1 as the first weight and all other values in the GM specification will be zero
+    
+    assert z.shape[0] == w.shape[0], "z and w must have the same length, but have lengths {} and {}".format(z.shape[0], w.shape[0])  
+
+    # Pre-Compute the moments of each w (w is always a Gaussian, so this is always needed)
+    moments_w = np.zeros((len(w), number_moments+1))
+    for i in range(w.shape[0]):
+        mu_w, c_w = w[i]
+        # Save the moments, augment a 0 moment to avoid indexing issues with the multinomial indexing
+        moments_w[i][0] = 1  
+        for j in range(1,number_moments+1):
+            moments_w[i][j] = gaussian_noncentral_moment(j, mu_w, c_w)
+    # Pre-Compute the Moments of each z (z could be Deterministic or GM, but the gm-moment-generation will handle this flexible)
+    moments_z = np.zeros((len(z), number_moments+1))
+    for i in range(z.shape[0]):
+        # mu, c and w are potentially multi-component GMs
+        mu_z, c_z, w_z = z[i]
+        # Save the moments, augment a 0 moment to avoid indexing issues with the multinomial indexing
+        moments_z[i][0] = 1
+        for j in range(1,number_moments+1):
+            moments_z[i][j] = gm_noncentral_moment(j, w_z, mu_z, c_z)
+            # ADD THE PEAK DIRAC MOMENT VALUE HERE
+            # BUT IT DOESNT EVEN CONTRIBUTE????
+
+    # Initialize result vector 
+    result = np.zeros(number_moments)
+
+    # Computation of the first ten moments
+    for i in range(1,number_moments+1):
+        # Get multinomial tuples for the desired moment and number of neuron inputs
+        tuples = np.array(tuple(generate_k_tuples(i, z.shape[0])))
+
+        # Iterate through the tuples (I turned it into an array, but still refer to it as value tuples)
+        for t in range(len(tuples)):
+            # Compute the multinomial coefficient of the current tuple
+            multinom_coeff =  factorial(i) // np.prod([factorial(k) for k in tuples[t,:]])
+            # Iterate through the tuple for every x_i and w_i in the pre-activation sum
+            expectation_product = 1
+            for j in range(z.shape[0]):
+                k = tuples[t,j]
+                # Do the expectation product
+                expectation_product *= moments_z[j][k] * moments_w[j][k]
+            # Add up all the values for the moments
+            result[i-1] += multinom_coeff * expectation_product
+    return result
+
 def moments_post_act(a:float,mu:np.ndarray,c:np.ndarray,w:np.ndarray,order:int=10): 
     """This function computes the post activation moments of a Gaussian mixture with arbitrary many components propagated through leaky relu
     
@@ -151,7 +213,7 @@ def match_moments(in_mom,components,solver="trust-constr"):
     """Function to perform the moment matching for given Moments and a desired number of components.
         Solver can be either SLSQP or trust-constr.
     """
-
+    start = time.time()
     #Fallback
     if components == 2:
         return match_moments_2(in_mom, components)
@@ -165,7 +227,7 @@ def match_moments(in_mom,components,solver="trust-constr"):
         params[i] = 1/components
 
     #Set the initial guess for the means as the input moments
-    params[components] = -1.8    
+    params[components] =-1.8   
     for i in range(components-1):
         params[components+i+1] = float(1.8*i)    # Rest of the means 
 
@@ -198,7 +260,7 @@ def match_moments(in_mom,components,solver="trust-constr"):
                             bounds=bounds,
                             constraints=[constraint],
                             #options={'disp': True, 'xtol': 1e-12, 'gtol':1e-12, 'maxiter': 100000}
-                            options={'disp': False, 'xtol': 1e-6, 'gtol': 1e-6, 'maxiter': 1000}
+                            #options={'disp': False, 'xtol': 1e-6, 'gtol': 1e-6, 'maxiter': 1000}
                             #options={'disp': False}
                         )
         end = time.time()
@@ -230,11 +292,14 @@ def match_moments(in_mom,components,solver="trust-constr"):
     c_res = np.array(result.x[components*2:])
 
     assert np.isclose(np.sum(w_res), 1.0, atol=1e-6), f"Weights do not sum to 1.0 (sum={np.sum(w_res)})"
-
+    end = time.time()
+    print("Time for optimization: {}".format(end-start))
     return mu_res, c_res, w_res
 
 def match_moments_2(in_mom, components):
     """Intermediate solution, only for two components"""
+    start = time.time()
+    print("Optimize...")
     if components != 2:
         raise ValueError("This function only works for two components")
     
@@ -250,7 +315,8 @@ def match_moments_2(in_mom, components):
     w_res = [result.x[0], 1 - result.x[0]]
     mu_res = [result.x[1], result.x[2]]
     c_res = [result.x[3], result.x[4]]
-
+    end = time.time()
+    print("Time for optimization: {}".format(end-start))
     return np.array(mu_res), np.array(c_res), np.array(w_res)
 
 def match_moments_special(in_mom,components,solver="trust-constr"):
@@ -361,6 +427,91 @@ def match_moments_2_special(in_mom, components):
     c_res = [result.x[2], result.x[3]]
 
     return np.array(mu_res), np.array(c_res), np.array(w_res)
+
+def match_moments_peak(in_mom, in_mass, components, solver="trust-constr"):
+    """ 
+    Function to perform the moment matching to a Gauzss Mixture in Combination with a fixed peak at 0.
+    The peak represents the probability mass that was below zero before the ReLU transformation.
+    We optimize the parameters of the Gaussian Mixture to match the moments of the input distribution, 
+    keeping the dirac in mind.
+
+    """
+
+    # Assemble the parameter vector according to the number of components. Per Component, we have 3 parameters: w, mu, c
+    # The complete parameter vector will look like this: [w0,w1...,wN,mu0,mu1,...,muN,c0,c1,...,cN]
+    params = np.zeros(components*3, dtype=float)
+
+    #Set the initial guess for the weights as equal and summing up to one-dirac mass
+    for i in range(components):
+        params[i] = (1-in_mass)/components
+
+    #Set the initial guess for the means as the input moments
+    params[components] = 0.1    
+    for i in range(components-1):
+        params[components+i+1] = float(1*i)    # Rest of the means 
+
+    #Set the initial guess for the variances as the input moments
+    for i in range(components):
+        params[components*2+i] = 0.1    
+    # Optimize this with the minimize function to add in the constraint on the sum of the weights
+
+    l_bounds = np.zeros(components*3)                       # Set the bounds for the parameters as 1D array
+    l_bounds[components:components*2] = -np.inf             # Lower bounds for the means
+    l_bounds[components*2:] = 0.0                           # Lower bounds for the variances
+
+    u_bounds = np.full(components*3, np.inf)                # Set the bounds for the parameters as 1D array
+    u_bounds[0:components] = 1.0                            # Upper bounds for the weights
+    # Means and variances already set to np.inf
+    bounds = Bounds(l_bounds, u_bounds)
+
+    if solver == "trust-constr":
+        in_constr = np.zeros((1,components*3))                      #Set a multiplicator for every parameter
+        in_constr[0,0:components] = 1.0                             # Only the weights are subject to the constraint
+        constraint  = LinearConstraint(in_constr, [1.0-in_mass], [1.0-in_mass])     # Constraint on the sum of the weights to 1-in_mass
+
+        # Call optimizer with bounds and constraints
+        start = time.time()	
+        result = minimize(residuals_matching_peak, 
+                            params,
+                            args=[*in_mom,0,in_mass],
+                            method='trust-constr',
+                            bounds=bounds,
+                            constraints=[constraint],
+                            #options={'disp': True, 'xtol': 1e-12, 'gtol':1e-12, 'maxiter': 100000}
+                            #options={'disp': False, 'xtol': 1e-6, 'gtol': 1e-6, 'maxiter': 1000}
+                            #options={'disp': False}
+                        )
+        end = time.time()
+        #print("Time for optimization: {}".format(end-start))
+    elif solver == "SLSQP":
+        constraint_dict = {'type': 'eq',
+                        'fun': lambda x: np.sum(x[:components]) - 1.0
+                        }
+        # Call optimizer with bounds and constraints
+        result = minimize(residuals_matching_peak, 
+                            params,
+                            args=in_mom,
+                            method='SLSQP',
+                            bounds=bounds,
+                            constraints=[constraint_dict],
+                            #options={'disp': True, 'xtol': 1e-12, 'gtol':1e-12, 'maxiter': 100000}
+                            options={'disp': False}
+                        )
+    else:
+        raise ValueError("Solver not supported. Please use either 'SLSQP' or 'trust-constr'")
+    
+    # print("Result of the optimization:")
+    # print(result)
+    # print("Final parameters:")
+    # print(result.x)
+    
+    w_res = np.array(result.x[:components])
+    mu_res = np.array(result.x[components:components*2])
+    c_res = np.array(result.x[components*2:])
+
+    #assert np.isclose(np.sum(w_res), 1.0, atol=1e-6), f"Weights do not sum to 1.0 (sum={np.sum(w_res)})"
+
+    return mu_res, c_res, w_res
 
 def residuals_matching_n(params, *args):
     """
@@ -473,6 +624,87 @@ def residuals_matching_2_special(params, *args):
     # This should return an array
     return residuals
 
+def residuals_matching_peak(params, *args):
+    """
+    Compute the residual value for the optimization process.
+    Returns the array of indivudal residuals for each moment.
+    This is for arbitrary component count, and with a additional dirac component
+    """
+    # Unpack the arguments
+    t = []
+    for temp in args:
+        t.append(temp)
+    t = np.array(t).squeeze()	
+
+    weight_dirac = t[-1]  # The last arg is the weight of the dirac component
+    place_dirac = t[-2]  # The second last arg is the place of the dirac component
+    num_moments = len(t) - 2  # Number of moments to match, excluding the dirac weight
+
+    # Infer how many components we have
+    components = int(len(params)/3)
+
+    # Extract the parameters from the input vector
+    w = params[:components]
+    mu = params[components:components*2]
+    c = params[components*2:components*3]
+
+    # Compute the moments of the Gaussian Mixture /Dirac hybrid
+    gm_moments = np.zeros(num_moments, dtype=float)
+    for i in range(num_moments):
+        gm_moments[i] = gm_noncentral_moment(i+1, w, mu, c)+weight_dirac*place_dirac**(i+1)
+
+    # Compute the weighted residuals
+    residuals = np.zeros(num_moments, dtype=float)
+    for i in range(num_moments):
+        residuals[i] = abs(gm_moments[i] - t[i])/t[i]
+    
+    # COmpute the summed squared residuals
+    residuals = np.sum(residuals**2)
+
+    # This should return an array
+    return residuals
+
+def match_samples_em(in_samples, components):
+    """
+    Function to perform the moment matching to a Gaussian Mixture using the EM algorithm.
+    The input is a set of samples, and the output is the parameters of the Gaussian Mixture.
+    """
+    # Initialize the Gaussian Mixture model
+    gmm = GaussianMixture(n_components=components, covariance_type='full')
+
+    # Fit the model to the samples
+    gmm.fit(in_samples.reshape(-1, 1))
+
+    # Extract the parameters
+    weights = gmm.weights_
+    means = gmm.means_.flatten()
+    covariances = gmm.covariances_.flatten()
+
+    return means, covariances, weights
+
+def sample_gm(mu, c, w, num_samples=1000):
+    """
+    Sample from a Gaussian Mixture model with given means, variances, and weights.
+    
+    mu: Means of the Gaussian components.
+    c: Variances of the Gaussian components.
+    w: Weights of the Gaussian components.
+    num_samples: Number of samples to generate.
+    
+    Returns:
+        samples: Array of sampled values from the Gaussian Mixture model.
+    """
+    # Check if the input arrays are valid
+    if len(mu) != len(c) or len(mu) != len(w):
+        raise ValueError("Means, variances, and weights must have the same length.")
+
+    # Sample from the Gaussian Mixture model
+    samples = np.zeros(num_samples)
+    for i in range(num_samples):
+        component = np.random.choice(len(mu), p=w)
+        samples[i] = np.random.normal(mu[component], np.sqrt(c[component]))
+
+    return samples
 #########################################################################################   
 # Define the network class to build actual architecture
 
@@ -480,7 +712,7 @@ class GaussianMixtureNetwork():
     """
     Bayesian Neural Network based on Gaussian weights and Gaussian Mixture intermediate approximations, based on higher order moment matching.
     """
-    def __init__(self,layers:list,activations:list,components_pre:int,components_post:int,moments_pre:int=10,moments_post:int=10,a_relu:float=0.01):
+    def __init__(self,layers:list,activations:list,components_pre:int,components_post:int,moments_pre:int=10,moments_post:int=10,a_relu:float=0.01, peak:bool=False):
         """
         Initialize the Gaussian Mixture Network with the given parameters.
 
@@ -490,6 +722,8 @@ class GaussianMixtureNetwork():
         components_post: Number of components for the post-activation layer.
         moments_pre: Number of moments to use in matching for the pre-activation layer.
         moments_post: Number of moments to use in matching for the post-activation layer.
+        a_relu: Slope of the ReLU activation function, used for the analytic moments.
+        peak: Boolean indicating whether to use a peak in the network, which will add a Dirac component at 0 for every neuron matching.
         """
         # Add values to instance
         self.layers = layers
@@ -499,10 +733,13 @@ class GaussianMixtureNetwork():
         self.moments_pre = moments_pre
         self.moments_post = moments_post
         self.a_relu = a_relu
-        self.verif_samples = 100000
+        self.verif_samples = 500000
+        self.verif_samples_em = 100000
+        self.peak = peak
 
         # Intialize the weights and biases
-        self.init_parameters()
+        self.init_parameters()      # For Analytic moment matching
+        self.init_parameters_em()   # For EM based moment matching
 
         # Reset actiuvation functions
         self.set_act_func()
@@ -523,7 +760,7 @@ class GaussianMixtureNetwork():
             weight_variance = np.ones((self.layers[i]+1, self.layers[i+1]))
             self.weight_variances.append(weight_variance)
 
-        # Initialize the containers for the GM parameters in pre-activation
+        # Initialize the containers for the GM parameters in pre-activation (and potentially Dirac Weight)
         self.means_gm_pre = []
         self.variances_gm_pre = []
         self.weights_gm_pre = []
@@ -534,16 +771,18 @@ class GaussianMixtureNetwork():
             self.variances_gm_pre.append(np.zeros((self.layers[i+1], self.components_pre)))
             self.weights_gm_pre.append(np.zeros((self.layers[i+1], self.components_pre)))
 
-        # Initialize the containers for the GM parameters in post-activation
+        # Initialize the containers for the GM parameters in post-activation (and potentially Dirac Weight)
         self.means_gm_post = []
         self.variances_gm_post = []
         self.weights_gm_post = []
+        self.dirac_weight_post = []
         # Iterate over the layers
         for i in range(len(self.layers)-1):
             # Append empty lists for each layer
             self.means_gm_post.append(np.zeros((self.layers[i+1], self.components_post)))
             self.variances_gm_post.append(np.zeros((self.layers[i+1], self.components_post)))
             self.weights_gm_post.append(np.zeros((self.layers[i+1], self.components_post)))
+            self.dirac_weight_post.append(np.zeros((self.layers[i+1])))
 
         # Generate pre-activation moment container for analytic
         self.pre_activation_moments_analytic = []
@@ -560,6 +799,61 @@ class GaussianMixtureNetwork():
             samples = np.zeros((self.layers[i+1],self.moments_post))
 
             self.post_activation_moments_analytic.append(samples)
+
+    def init_parameters_em(self):
+        """Initialize the structure and the prior parameters of the network FOR EM BASED COMPUTATION"""
+        # Initialize weight and bias values
+        self.weight_means_em = []
+        self.weight_variances_em = []
+        # # Iterate over the layers
+        # for i in range(len(self.layers)-1):
+        #     # Initialize the weights for each layer. Add 1 for the bias
+        #     weight_mean = np.random.rand(self.layers[i]+1, self.layers[i+1])
+        #     self.weight_means_em.append(weight_mean)
+        #     weight_variance = np.ones((self.layers[i]+1, self.layers[i+1]))
+        #     self.weight_variances_em.append(weight_variance)
+        self.weight_means_em = self.weight_means.copy()  # Use the same means as for the analytic matching
+        self.weight_variances_em = self.weight_variances.copy()  # Use the same variances as for the analytic matching
+
+        # Initialize the containers for the GM parameters in pre-activation (and potentially Dirac Weight)
+        self.means_gm_pre_em = []
+        self.variances_gm_pre_em = []
+        self.weights_gm_pre_em = []
+        # Iterate over the layers
+        for i in range(len(self.layers)-1):
+            # Append empty lists for each layer
+            self.means_gm_pre_em.append(np.zeros((self.layers[i+1], self.components_pre)))
+            self.variances_gm_pre_em.append(np.zeros((self.layers[i+1], self.components_pre)))
+            self.weights_gm_pre_em.append(np.zeros((self.layers[i+1], self.components_pre)))
+
+        # Initialize the containers for the GM parameters in post-activation (and potentially Dirac Weight)
+        self.means_gm_post_em = []
+        self.variances_gm_post_em = []
+        self.weights_gm_post_em = []
+        self.dirac_weight_post_em = []
+        # Iterate over the layers
+        for i in range(len(self.layers)-1):
+            # Append empty lists for each layer
+            self.means_gm_post_em.append(np.zeros((self.layers[i+1], self.components_post)))
+            self.variances_gm_post_em.append(np.zeros((self.layers[i+1], self.components_post)))
+            self.weights_gm_post_em.append(np.zeros((self.layers[i+1], self.components_post)))
+            self.dirac_weight_post_em.append(np.zeros((self.layers[i+1])))
+
+        # Generate pre-activation moment container for analytic
+        self.pre_activation_moments_em = []
+        # Iterate through layers
+        for i in range(len(self.layers)-1):
+            samples = np.zeros((self.layers[i+1],self.moments_pre))
+
+            self.pre_activation_moments_em.append(samples)
+        
+        # Generate post-activation moment container for analytic
+        self.post_activation_moments_em = []
+        # Iterate through layers
+        for i in range(len(self.layers)-1):
+            samples = np.zeros((self.layers[i+1],self.moments_post))
+
+            self.post_activation_moments_em.append(samples)
 
     def sample_weights(self):
         """Generate samples of every weight and bias in the network, mainly needed for verification"""
@@ -614,7 +908,61 @@ class GaussianMixtureNetwork():
             samples = np.zeros((self.layers[i+1],self.moments_post))
 
             self.post_activation_moments_samples.append(samples)
+
+    def sample_weights_em(self):
+        """Generate samples of every weight and bias in the network, mainly needed for verification"""
+        # Generate weight samples
+        self.weight_samples_em = []
+        # Iterate through layers
+        for i in range(len(self.layers)-1):
+            # Shape: (verif_samples, in_features+1, out_features)
+            samples = np.zeros((self.verif_samples_em, self.layers[i]+1, self.layers[i+1]))
+            for row in range(self.layers[i]+1):
+                for col in range(self.layers[i+1]):
+                    samples[:, row, col] = np.random.normal(
+                    self.weight_means_em[i][row, col],
+                    self.weight_variances_em[i][row, col],
+                    self.verif_samples_em
+                    )
+            self.weight_samples_em.append(samples)
         
+        # Generate post-activation sample container
+        self.post_activation_samples_em = []
+        # Iterate through layers
+        for i in range(len(self.layers)-1):
+            # Shape: (verif_samples, number of neurons in the layer+1)
+            samples = np.zeros((self.verif_samples_em, self.layers[i+1]+1))
+            #Turn the Bias samples onto ones
+            samples[:, -1] = 1
+
+            self.post_activation_samples_em.append(samples)
+
+        # Generate pre-activation sample container^
+        self.pre_activation_samples_em = []
+        # Iterate through layers
+        for i in range(len(self.layers)-1):
+            # Shape: (verif_samples, number of neurons in the layer)
+            samples = np.zeros((self.verif_samples_em, self.layers[i+1]))
+            # We don't save an extra bias here, this will only come in the post activation state
+
+            self.pre_activation_samples_em.append(samples)
+
+        # Generate pre-activation moment container
+        self.pre_activation_moments_em = []
+        # Iterate through layers
+        for i in range(len(self.layers)-1):
+            samples = np.zeros((self.layers[i+1],self.moments_pre))
+
+            self.pre_activation_moments_em.append(samples)
+        
+        # Generate post-activation moment container
+        self.post_activation_moments_em = []
+        # Iterate through layers
+        for i in range(len(self.layers)-1):
+            samples = np.zeros((self.layers[i+1],self.moments_post))
+
+            self.post_activation_moments_em.append(samples)
+
     def set_act_func(self):
         """Set the activation functions for the network from string to handle"""
         # Initialize the activation functions
@@ -651,6 +999,21 @@ class GaussianMixtureNetwork():
         print(f" Pre-activation GM components: {self.components_pre}, matched with {self.moments_pre} moments")
         print(f" Post-activation GM components: {self.components_post}, matched with {self.moments_post} moments")
         print(f" Leaky ReLU slope (a): {self.a_relu}")
+    
+    def compute_absorbed_mass(self, w, mu, c):
+        """
+        Compute the absorbed mass (probability mass below zero) for a Gaussian Mixture.
+        Args:
+            w: weights of the Gaussian mixture (array-like)
+            mu: means of the Gaussian mixture (array-like)
+            c: variances of the Gaussian mixture (array-like)
+        Returns:
+            absorbed_mass: total probability mass below zero
+        """
+        sigma = np.sqrt(c)
+        sigma = np.where(sigma == 0, 1e-12, sigma)
+        absorbed_mass = np.sum(w * 0.5 * (1 + erf(-mu / (np.sqrt(2) * sigma))))
+        return absorbed_mass
 
     def compare_sample_moments_forward(self,x):
         """Makes a forward pass in both implemented methods and compares the moments"""
@@ -666,15 +1029,35 @@ class GaussianMixtureNetwork():
         stop = time.time()
         print(f"Time for momentmatch: {stop-start:.2f} s")
 
-        for i in range(len(self.pre_activation_moments_analytic)):
-            rel_pre = np.round(100*(self.pre_activation_moments_analytic[i]-self.pre_activation_moments_samples[i])/self.pre_activation_moments_samples[i],2)
+        start = time.time()
+        result = self.forward_em(x)
+        stop = time.time()
+        print(f"Time for EM : {stop-start:.2f} s")
 
-            rel_post = np.round(100*(self.post_activation_moments_analytic[i]-self.post_activation_moments_samples[i])/self.post_activation_moments_samples[i],2)
+        # for i in range(len(self.pre_activation_moments_analytic)):
+        #     rel_pre = np.round(100*(self.pre_activation_moments_analytic[i]-self.pre_activation_moments_samples[i])/self.pre_activation_moments_samples[i],2)
+
+        #     rel_post = np.round(100*(self.post_activation_moments_analytic[i]-self.post_activation_moments_samples[i])/self.post_activation_moments_samples[i],2)
+
+        #     print()
+        #     print(f"******Layer {i}******")
+        #     print(f"Max. Pre activation rel. error: {np.max(abs(rel_pre))} %; Max. First Moment rel. error: {np.max(abs(rel_pre[:,0]))} %")
+        #     print(f"Max. Post activation rel. error: {np.max(abs(rel_post))} %; Max. First Moment rel. error: {np.max(abs(rel_post[:,0]))} %")
+
+        for i in range(len(self.pre_activation_moments_analytic)):
+            rel_pre_analytic = np.round(100 * (self.pre_activation_moments_analytic[i] - self.pre_activation_moments_samples[i]) / (self.pre_activation_moments_samples[i] + 1e-12), 2)
+            rel_post_analytic = np.round(100 * (self.post_activation_moments_analytic[i] - self.post_activation_moments_samples[i]) / (self.post_activation_moments_samples[i] + 1e-12), 2)
+            rel_pre_em = np.round(100 * (self.pre_activation_moments_em[i] - self.pre_activation_moments_samples[i]) / (self.pre_activation_moments_samples[i] + 1e-12), 2)
+            rel_post_em = np.round(100 * (self.post_activation_moments_em[i] - self.post_activation_moments_samples[i]) / (self.post_activation_moments_samples[i] + 1e-12), 2)
 
             print()
             print(f"******Layer {i}******")
-            print(f"Max. Pre activation rel. error: {np.max(abs(rel_pre))} %; Max. First Moment rel. error: {np.max(abs(rel_pre[:,0]))} %")
-            print(f"Max. Post activation rel. error: {np.max(abs(rel_post))} %; Max. First Moment rel. error: {np.max(abs(rel_post[:,0]))} %")
+            print(f"Analytic vs Samples:")
+            print(f"  Max. Pre activation rel. error: {np.max(abs(rel_pre_analytic))} %; Max. First Moment rel. error: {np.max(abs(rel_pre_analytic[:,0]))} %")
+            print(f"  Max. Post activation rel. error: {np.max(abs(rel_post_analytic))} %; Max. First Moment rel. error: {np.max(abs(rel_post_analytic[:,0]))} %")
+            print(f"EM vs Samples:")
+            print(f"  Max. Pre activation rel. error: {np.max(abs(rel_pre_em))} %; Max. First Moment rel. error: {np.max(abs(rel_pre_em[:,0]))} %")
+            print(f"  Max. Post activation rel. error: {np.max(abs(rel_post_em))} %; Max. First Moment rel. error: {np.max(abs(rel_post_em[:,0]))} %")
 
     def forward_moments(self,x):
         """
@@ -705,7 +1088,6 @@ class GaussianMixtureNetwork():
             moments_pre = moments_pre_act_combined_general(x_array,w_array,order=self.moments_pre)
             self.pre_activation_moments_analytic[0][i,:] = moments_pre
 
-            # Match the GM parameters to the moments
             means, variances, weights = match_moments(moments_pre, components = self.components_pre)
             self.means_gm_pre[0][i,:] = means
             self.variances_gm_pre[0][i,:] = variances
@@ -716,11 +1098,20 @@ class GaussianMixtureNetwork():
             moments_post =  moments_post_act(self.a_relu, means, variances, weights,order=self.moments_post)
             self.post_activation_moments_analytic[0][i,:] = moments_post
 
-            # Match the GM parameters to the moments
-            means, variances, weights = match_moments(moments_post, components = self.components_post)
-            self.means_gm_post[0][i,:] = means
-            self.variances_gm_post[0][i,:] = variances
-            self.weights_gm_post[0][i,:] = weights
+            if self.peak:
+                # If we have a peak, we need to match the moments with a Dirac component at 0
+                absorbed_mass = self.compute_absorbed_mass(weights, means, variances)
+                means, variances, weights = match_moments_peak(moments_post, absorbed_mass, components = self.components_post)
+                self.means_gm_post[0][i,:] = means
+                self.variances_gm_post[0][i,:] = variances
+                self.weights_gm_post[0][i,:] = weights
+                self.dirac_weight_post[0][i] = absorbed_mass  # Set the Dirac weight to the absorbed mass                    
+            else:
+                # Match the GM parameters to the moments
+                means, variances, weights = match_moments(moments_post, components = self.components_post)
+                self.means_gm_post[0][i,:] = means
+                self.variances_gm_post[0][i,:] = variances
+                self.weights_gm_post[0][i,:] = weights
 
         ######
         # Iterate over the rest of the layers
@@ -753,11 +1144,20 @@ class GaussianMixtureNetwork():
                     moments_post =  moments_post_act(self.a_relu, means, variances, weights,order=self.moments_post)
                     self.post_activation_moments_analytic[l][i,:] = moments_post
 
-                    # Match the GM parameters to the moments
-                    means, variances, weights = match_moments(moments_post, components = self.components_post)
-                    self.means_gm_post[l][i,:] = means
-                    self.variances_gm_post[l][i,:] = variances
-                    self.weights_gm_post[l][i,:] = weights
+                    if self.peak:
+                        # If we have a peak, we need to match the moments with a Dirac component at 0
+                        absorbed_mass = self.compute_absorbed_mass(weights, means, variances)
+                        means, variances, weights = match_moments_peak(moments_post, absorbed_mass, components = self.components_post)
+                        self.means_gm_post[l][i,:] = means
+                        self.variances_gm_post[l][i,:] = variances
+                        self.weights_gm_post[l][i,:] = weights
+                        self.dirac_weight_post[l][i] = absorbed_mass  # Set the Dirac weight to the absorbed mass                    
+                    else:
+                        # Match the GM parameters to the moments
+                        means, variances, weights = match_moments(moments_post, components = self.components_post)
+                        self.means_gm_post[l][i,:] = means
+                        self.variances_gm_post[l][i,:] = variances
+                        self.weights_gm_post[l][i,:] = weights
                     
                 elif self.activations[l] == 'linear':
                     # Just take the pre moments as the transformation is linear with slope 1
@@ -860,3 +1260,123 @@ class GaussianMixtureNetwork():
 
         ######
         return self.post_activation_samples[-1]
+    
+    def forward_em(self,x):
+        """
+        Forward pass through the network based on EM.
+        x: Input data, deterministic
+        """
+        # Generate sample representation of every weight and prepare the intermediate sample values
+        self.sample_weights_em()
+
+        if isinstance(x,float) or isinstance(x,int):    
+            x = np.array([[x]])
+
+        assert len(x) == self.layers[0], f"Input data must have {self.layers[0]} features, but got {len(x)}"
+
+        # Augment Bias 
+        x = np.concatenate((x, np.ones((1, 1))), axis=0)
+
+        # Indexing a GM Parameter value is done by [layer][neuron,component]
+
+        ######
+        # Handle the first layer seperately as it uses deterministic input
+        ######
+        # Note: I assume that the first ectivation is ReLU
+        # Iterate over the neurons in the first layer
+        for i in range(self.layers[1]):
+            # Compute pre avtivation 
+            # pre_act_samples shape: (verif_samples,)
+            pre_act_samples = np.dot(x.squeeze(), self.weight_samples_em[0][:, :, i].T)
+
+            # REAPPROXIMATE THE SAMPLE SET WITH GM
+            means, variances, weights = match_samples_em(pre_act_samples, self.components_pre)
+            self.means_gm_pre_em[0][i,:] = means
+            self.variances_gm_pre_em[0][i,:] = variances
+            self.weights_gm_pre_em[0][i,:] = weights
+            # RESAMPLE FROM THE APPROXIMATED GM
+            pre_act_samples_re = sample_gm(means, variances, weights, self.verif_samples_em)
+
+            # Store the samples in the pre activation sample container
+            self.pre_activation_samples_em[0][:, i] = pre_act_samples_re
+
+            # Compute the empirical moments of the sample set
+            moments = np.zeros(self.moments_pre)
+            for order in range(1, self.moments_pre+1):
+                moments[order-1] = np.mean(pre_act_samples_re**order)
+
+            self.pre_activation_moments_em[0][i, :] = moments
+
+            # Propagate the samples through Activation function
+            post_act_samples = self.activation_functions[0](pre_act_samples_re)
+
+            # REAPPROXIMATE THE SAMPLE SET WITH GM
+            means, variances, weights = match_samples_em(post_act_samples, self.components_post)
+            self.means_gm_post_em[0][i,:] = means
+            self.variances_gm_post_em[0][i,:] = variances
+            self.weights_gm_post_em[0][i,:] = weights
+            # RESAMPLE FROM THE APPROXIMATED GM
+            post_act_samples_re = sample_gm(means, variances, weights, self.verif_samples_em)
+
+            # Compute the empirical moments of the sample set
+            moments = np.zeros(self.moments_post)
+            for order in range(1, self.moments_post+1):
+                moments[order-1] = np.mean(post_act_samples_re**order)
+
+            self.post_activation_moments_em[0][i, :] = moments
+
+            # Store the samples in the post activation sample container
+            self.post_activation_samples_em[0][:, i] = post_act_samples_re
+
+
+        ######
+        # Iterate over the rest of the layers
+        # I need to handle the bias term seperately as it is (Gauss x Deterministic)
+        ######
+        for l in range(1, len(self.layers)-1):
+            # Compute pre avtivation 
+            # pre_act_samples shape: (verif_samples,neurons)
+            # Append the post activation samples with from before with bias samples
+            pre_act_samples = np.einsum('bi,bij->bj', self.post_activation_samples_em[l-1], self.weight_samples_em[l])
+
+            for i in range(self.layers[l+1]):
+                # FOR EVERY NEURON; APPROXIMATE THE SAMPLE SET WITH GM
+                means, variances, weights = match_samples_em(pre_act_samples[:,i], self.components_pre)
+                self.means_gm_pre_em[l][i,:] = means
+                self.variances_gm_pre_em[l][i,:] = variances
+                self.weights_gm_pre_em[l][i,:] = weights
+                # RESAMPLE FROM THE APPROXIMATED GM
+                pre_act_samples_re = sample_gm(means, variances, weights, self.verif_samples_em)
+
+                # Store the samples in the pre activation sample container
+                self.pre_activation_samples_em[l][:,i] = pre_act_samples_re
+
+                # Compute the empirical moments of the sample set
+                moments = np.zeros(self.moments_pre)
+                for order in range(1, self.moments_pre+1):
+                    moments[order-1] = np.mean(pre_act_samples_re**order)
+
+                self.pre_activation_moments_em[l][i, :] = moments
+
+                # Propagate Samples through Activation function
+                post_act_samples = self.activation_functions[l](pre_act_samples_re)
+                # REAPPROXIMATE THE SAMPLE SET WITH GM
+                means, variances, weights = match_samples_em(post_act_samples, self.components_post)
+                self.means_gm_post_em[l][i,:] = means
+                self.variances_gm_post_em[l][i,:] = variances
+                self.weights_gm_post_em[l][i,:] = weights
+                # RESAMPLE FROM THE APPROXIMATED GM
+                post_act_samples_re = sample_gm(means, variances, weights, self.verif_samples_em)
+
+                # Store the samples in the post activation sample container
+                self.post_activation_samples_em[l][:,i] = post_act_samples_re
+
+                # Compute the empirical moments of the sample set
+                moments = np.zeros(self.moments_post)
+                for order in range(1, self.moments_post+1):
+                    moments[order-1] = np.mean(post_act_samples_re**order)
+
+                self.post_activation_moments_em[l][i, :] = moments
+
+        ######
+        return self.post_activation_samples_em[-1]

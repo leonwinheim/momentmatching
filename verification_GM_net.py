@@ -13,19 +13,63 @@ print("GaussianMixtureNetwork")
 from sklearn.mixture import GaussianMixture
 import seaborn as sns
 import time
+import os
+from scipy.special import erf
 
 print("Rennt..")
+
+os.environ["LOKY_MAX_CPU_COUNT"] = "10"
 
 # Flags to chose what to do
 verify_pre_act = False
 verify_post_act = False
 verify_moment_matching = False
-verify_network = True
+verify_network = False
 verify_moment_spike = False
-verify_gauss_moment = True
+verify_gauss_moment = False
+verify_network_peak = True
+verify_moment_matching_peak = False
 
 # Control variables
 np.random.seed(4)  # Set seed for reproducibility
+
+# Own Functions
+def sample_from_gmm(weights, means, variances, n_samples):
+    # Step 1: Choose components according to their weights
+    component_choices = np.random.choice(len(weights), size=n_samples, p=weights)
+    
+    # Step 2: Sample from the corresponding Gaussians
+    samples = np.random.normal(loc=np.array(means)[component_choices],
+                               scale=np.array(np.sqrt(variances))[component_choices])
+    return samples
+
+def sample_from_dirac_gauss_mixture(dirac_weights, dirac_locs, gauss_weights, gauss_means, gauss_sigmas, n_samples):
+    # Combine all component weights
+    weights = np.concatenate([dirac_weights, gauss_weights])
+    
+    # Ensure weights sum to 1 (optional, but good practice)
+    weights = weights / np.sum(weights)
+    
+    n_diracs = len(dirac_weights)
+    n_gaussians = len(gauss_weights)
+    
+    # Choose which component to sample from
+    component_choices = np.random.choice(n_diracs + n_gaussians, size=n_samples, p=weights)
+    
+    # Prepare the samples array
+    samples = np.empty(n_samples)
+    
+    # Sample from Dirac components
+    for i, loc in enumerate(dirac_locs):
+        indices = (component_choices == i)
+        samples[indices] = loc
+    
+    # Sample from Gaussian components
+    for j, (mu, sigma) in enumerate(zip(gauss_means, gauss_sigmas)):
+        indices = (component_choices == n_diracs + j)
+        samples[indices] = np.random.normal(loc=mu, scale=sigma, size=np.sum(indices))
+    
+    return samples
 
 if verify_pre_act:
     #******Verify the function of the analytical moment computation******
@@ -216,8 +260,8 @@ if verify_network:
     act_func = ['relu','relu','linear']
     gm_comp_pre = 2
     gm_comp_post = 2
-    moments_pre = 5
-    moments_post = 5
+    moments_pre = 10
+    moments_post = 10
 
     print("Initializing model...")
     model = GMN.GaussianMixtureNetwork(layers,act_func,gm_comp_pre,gm_comp_post,moments_pre,moments_post,0.05)
@@ -247,15 +291,6 @@ if verify_network:
         for neuron in range(layers[layer+1]):
             print(f"***Layer {layer}, Neuron {neuron}***")
             # Pre Activation
-            # Make the sample kde
-            # sns.kdeplot(
-            #     model.pre_activation_samples[layer][:, neuron], 
-            #     ax=axes[neuron, layer*2], 
-            #     fill=True, 
-            #     label='Sampled',
-            #     color='blue',
-            #     bw_adjust=kde_bw_adjust
-            # )
             axes[neuron, layer*2].hist(
                 model.pre_activation_samples[layer][:, neuron],
                 bins=50,
@@ -266,8 +301,6 @@ if verify_network:
             )
             # Add a vertical line at the sample mean
             sample_mean = np.mean(model.pre_activation_samples[layer][:, neuron])
-            # sample_mean_moment = model.pre_activation_moments_samples[layer][neuron,0]
-            # print(f"Sample vs Moment Pre-Act Sample: {sample_mean:.2f} vs {sample_mean_moment:.2f}")
 
             axes[neuron, layer*2].axvline(
                 sample_mean, 
@@ -283,14 +316,6 @@ if verify_network:
 
             gm_samples = gm.sample(num_samples)[0].flatten()
 
-            # sns.kdeplot(
-            #     gm_samples, 
-            #     ax=axes[neuron, layer*2], 
-            #     fill=True, 
-            #     label='GM',
-            #     color='orange',
-            #     bw_adjust=kde_bw_adjust
-            # )
             axes[neuron, layer*2].hist(
                 gm_samples,
                 bins=50,
@@ -301,10 +326,6 @@ if verify_network:
             )
             # Add a vertical line at the GM mean
             gm_mean = np.mean(gm_samples)
-            # gm_mean_moment = model.pre_activation_moments_analytic[layer][neuron,0]
-            # gm_mean_moment_new = GMN.e1_gm(model.weights_gm_pre[layer][neuron, :], model.means_gm_pre[layer][neuron, :], model.variances_gm_pre[layer][neuron, :])
-
-            # print(f"Sample vs Moment Pre Act GM : Samp{gm_mean:.2f} vs Soll{gm_mean_moment:.2f} vs Ist{gm_mean_moment_new:.2f}")
 
             axes[neuron, layer*2].axvline(
                 gm_mean, 
@@ -313,17 +334,35 @@ if verify_network:
                 label=f'GM Mean: {gm_mean:.2f}'
             )
 
+            # Generate and plot EM-GM samples from the moment matching
+            gm = GaussianMixture(n_components=gm_comp_pre)
+            gm.means_ = model.means_gm_pre_em[layer][neuron, :].reshape(-1, 1)
+            gm.covariances_ = model.variances_gm_pre_em[layer][neuron, :].reshape(-1, 1, 1)
+            gm.weights_ = model.weights_gm_pre_em[layer][neuron, :]
+
+            gm_samples_em = gm.sample(num_samples)[0].flatten()
+
+            axes[neuron, layer*2].hist(
+                gm_samples_em,
+                bins=50,
+                density=True,
+                alpha=0.6,
+                color='green',
+                label='EM-GM'
+            )
+            # Add a vertical line at the GM mean
+            gm_mean_em = np.mean(gm_samples_em)
+
+            axes[neuron, layer*2].axvline(
+                gm_mean_em, 
+                color='green', 
+                linestyle='--', 
+                label=f'EM-GM Mean: {gm_mean_em:.2f}'
+            )
+
             axes[neuron, layer*2].set_title(f'L {layer} N {neuron} Pre-Act')
+
             # Post Activation
-            # Make the sample kde
-            # sns.kdeplot(
-            #     model.post_activation_samples[layer][:, neuron], 
-            #     ax=axes[neuron, layer*2+1], 
-            #     fill=True, 
-            #     label='Sampled',
-            #     color='blue',
-            #     bw_adjust=kde_bw_adjust
-            # )
             axes[neuron, layer*2+1].hist(
                 model.post_activation_samples[layer][:, neuron],
                 bins=50,
@@ -334,8 +373,6 @@ if verify_network:
             )
             # Add a vertical line at the sample mean
             sample_mean = np.mean(model.post_activation_samples[layer][:, neuron])
-            # sample_mean_moment = model.post_activation_moments_samples[layer][neuron,0]
-            # print(f"Sample vs Moment Post-Act Samples: {sample_mean:.2f} vs {sample_mean_moment:.2f}")
 
             axes[neuron, layer*2+1].axvline(
                 sample_mean, 
@@ -352,14 +389,6 @@ if verify_network:
 
             gm_samples = gm.sample(num_samples)[0].flatten()
 
-            # sns.kdeplot(
-            #     gm_samples, 
-            #     ax=axes[neuron, layer*2+1], 
-            #     fill=True, 
-            #     label='GM',
-            #     color='orange',
-            #     bw_adjust=kde_bw_adjust
-            # )
             axes[neuron, layer*2+1].hist(
                 gm_samples,
                 bins=50,
@@ -370,16 +399,38 @@ if verify_network:
             )
             # Add a vertical line at the GM mean
             gm_mean = np.mean(gm_samples)
-            # gm_mean_moment = model.post_activation_moments_analytic[layer][neuron,0]	
-            # gm_mean_moment_new = GMN.e1_gm(model.weights_gm_post[layer][neuron, :], model.means_gm_post[layer][neuron, :], model.variances_gm_post[layer][neuron, :])
-
-            # print(f"Sample vs Moment Post Act GM :Samp{gm_mean:.2f} vs Soll{gm_mean_moment:.2f} vs Ist{gm_mean_moment_new:.2f}")
 
             axes[neuron, layer*2+1].axvline(
                 gm_mean, 
                 color='orange', 
                 linestyle='--', 
                 label=f'GM Mean: {gm_mean:.2f}'
+            )
+
+            # Generate and plot EM-GM samples from the moment matching
+            gm = GaussianMixture(n_components=gm_comp_post)
+            gm.means_ = model.means_gm_post_em[layer][neuron, :].reshape(-1, 1)
+            gm.covariances_ = model.variances_gm_post_em[layer][neuron, :].reshape(-1, 1, 1)
+            gm.weights_ = model.weights_gm_post_em[layer][neuron, :]
+
+            gm_samples_em = gm.sample(num_samples)[0].flatten()
+
+            axes[neuron, layer*2+1].hist(
+                gm_samples_em,
+                bins=50,
+                density=True,
+                alpha=0.6,
+                color='green',
+                label='EM-GM'
+            )
+            # Add a vertical line at the GM mean
+            gm_mean_em = np.mean(gm_samples_em)
+
+            axes[neuron, layer*2+1].axvline(
+                gm_mean_em, 
+                color='green', 
+                linestyle='--', 
+                label=f'EM-GM Mean: {gm_mean_em:.2f}'
             )
 
             axes[neuron, layer*2+1].set_title(f'L {layer} N{neuron} Post-Act')
@@ -465,3 +516,283 @@ if verify_moment_spike:
     plt.ylabel("Freq")
     plt.tight_layout()
     plt.savefig('figures/moment_matching_3comp.png', dpi=300)
+
+if verify_network_peak:
+    layers = [1,5,5,1]
+    act_func = ['relu','relu','linear']
+    gm_comp_pre = 2
+    gm_comp_post = 2
+    moments_pre = 10
+    moments_post = 10
+    peak = False
+
+    print("Initializing model...")
+    model = GMN.GaussianMixtureNetwork(layers,act_func,gm_comp_pre,gm_comp_post,moments_pre,moments_post,0.00,peak=peak)
+    print("Initialized model.")
+    model.print_network()
+    print()
+
+    x = np.array([[2.0]])
+
+    #Call comparison function
+    model.compare_sample_moments_forward(x)
+
+    #******Visualization******
+    num_samples = 10000
+
+    # Set kernel width multiplier for all kdeplots
+    kde_bw_adjust = 0.5  # You can adjust this value as needed
+    print()
+    print("Make figure...")
+    print()
+    fig, axes = plt.subplots(
+        ncols=(len(layers)-1)*2, 
+        nrows=max(layers), 
+        figsize=(8*max(layers), 6*(len(layers)-1))  # Broadened width from 4* to 8*
+    )
+    for layer in range(len(layers)-1):
+        for neuron in range(layers[layer+1]):
+            print(f"***Layer {layer}, Neuron {neuron}***")
+            # Pre Activation
+            axes[neuron, layer*2].hist(
+                model.pre_activation_samples[layer][:, neuron],
+                bins=50,
+                density=True,
+                alpha=0.6,
+                color='blue',
+                label='Sampled'
+            )
+            # Add a vertical line at the sample mean
+            sample_mean = np.mean(model.pre_activation_samples[layer][:, neuron])
+
+            axes[neuron, layer*2].axvline(
+                sample_mean, 
+                color='blue', 
+                linestyle='--', 
+                label=f'Mean: {sample_mean:.2f}'
+            )
+            # Generate and plot GM samples from the moment matching
+
+            # Sample from two independent Gaussians and append the samples to a list
+            means = model.means_gm_pre[layer][neuron, :]
+            variances = model.variances_gm_pre[layer][neuron, :]
+            weights = model.weights_gm_pre[layer][neuron, :]
+            gm_samples = sample_from_gmm(weights, means, variances, num_samples)
+
+            axes[neuron, layer*2].hist(
+                gm_samples,
+                bins=50,
+                density=True,
+                alpha=0.6,
+                color='orange',
+                label='GM'
+            )
+            # Add a vertical line at the GM mean
+            gm_mean = np.mean(gm_samples)
+
+            axes[neuron, layer*2].axvline(
+                gm_mean, 
+                color='orange', 
+                linestyle='--', 
+                label=f'GM Mean: {gm_mean:.2f}'
+            )
+
+            # Generate and plot EM-GM samples from the moment matching
+            gm = GaussianMixture(n_components=gm_comp_pre)
+            gm.means_ = model.means_gm_pre_em[layer][neuron, :].reshape(-1, 1)
+            gm.covariances_ = model.variances_gm_pre_em[layer][neuron, :].reshape(-1, 1, 1)
+            gm.weights_ = model.weights_gm_pre_em[layer][neuron, :]
+
+            gm_samples_em = gm.sample(num_samples)[0].flatten()
+
+            axes[neuron, layer*2].hist(
+                gm_samples_em,
+                bins=50,
+                density=True,
+                alpha=0.6,
+                color='green',
+                label='EM-GM'
+            )
+            # Add a vertical line at the GM mean
+            gm_mean_em = np.mean(gm_samples_em)
+
+            axes[neuron, layer*2].axvline(
+                gm_mean_em, 
+                color='green', 
+                linestyle='--', 
+                label=f'EM-GM Mean: {gm_mean_em:.2f}'
+            )
+
+            axes[neuron, layer*2].set_title(f'L {layer} N {neuron} Pre-Act')
+
+            # Post Activation
+            axes[neuron, layer*2+1].hist(
+                model.post_activation_samples[layer][:, neuron],
+                bins=50,
+                density=True,
+                alpha=0.6,
+                color='blue',
+                label='Sampled'
+            )
+            # Add a vertical line at the sample mean
+            sample_mean = np.mean(model.post_activation_samples[layer][:, neuron])
+
+            axes[neuron, layer*2+1].axvline(
+                sample_mean, 
+                color='blue', 
+                linestyle='--', 
+                label=f'Mean: {sample_mean:.2f}'
+            )
+
+            # Generate and plot GM samples from the moment matching
+            # Sample from two independent Gaussians and append the samples to a list
+            means = model.means_gm_post[layer][neuron, :]
+            variances = model.variances_gm_post[layer][neuron, :]
+            weights = model.weights_gm_post[layer][neuron, :]
+            if peak:
+                dirac_weight = model.dirac_weight_post[layer][neuron]
+                dirac_locs = 0
+                gm_samples = sample_from_dirac_gauss_mixture(np.array([dirac_weight]),np.array([0]),weights,means,variances,num_samples)
+            else:
+                gm_samples = sample_from_gmm(weights, means, variances, num_samples)
+
+            axes[neuron, layer*2+1].hist(
+                gm_samples,
+                bins=50,
+                density=True,
+                alpha=0.6,
+                color='orange',
+                label='GM'
+            )
+            # Add a vertical line at the GM mean
+            gm_mean = np.mean(gm_samples)
+
+            axes[neuron, layer*2+1].axvline(
+                gm_mean, 
+                color='orange', 
+                linestyle='--', 
+                label=f'GM Mean: {gm_mean:.2f}'
+            )
+
+            # Generate and plot EM-GM samples from the moment matching
+            gm = GaussianMixture(n_components=gm_comp_post)
+            gm.means_ = model.means_gm_post_em[layer][neuron, :].reshape(-1, 1)
+            gm.covariances_ = model.variances_gm_post_em[layer][neuron, :].reshape(-1, 1, 1)
+            gm.weights_ = model.weights_gm_post_em[layer][neuron, :]
+
+            gm_samples_em = gm.sample(num_samples)[0].flatten()
+
+            axes[neuron, layer*2+1].hist(
+                gm_samples_em,
+                bins=50,
+                density=True,
+                alpha=0.6,
+                color='green',
+                label='EM-GM'
+            )
+            # Add a vertical line at the GM mean
+            gm_mean_em = np.mean(gm_samples_em)
+
+            axes[neuron, layer*2+1].axvline(
+                gm_mean_em, 
+                color='green', 
+                linestyle='--', 
+                label=f'EM-GM Mean: {gm_mean_em:.2f}'
+            )
+
+            axes[neuron, layer*2+1].set_title(f'L {layer} N{neuron} Post-Act')
+
+            #Activate legends
+            axes[neuron, layer*2].legend(loc='upper right')
+            axes[neuron, layer*2+1].legend(loc='upper right')
+
+
+    plt.tight_layout()
+    plt.savefig('figures/GMN_verification.png', dpi=300)
+
+if verify_moment_matching_peak:
+    #Produce some Gaussian Samples
+    num_samples = 100000
+    mu = 0.0
+    sigma = 1.0
+    samples = np.random.normal(mu, sigma, num_samples)
+    # Propagate the samples through a leaky ReLU
+    alpha = 0.0
+    def leaky_relu_peak(x, alpha=0.1):
+        return np.where(x > 0, x, alpha * x)
+    z_samples = leaky_relu_peak(samples, alpha)
+    # Compute analytical moments of propagated density
+    analytic_moments = GMN.moments_post_act(alpha, np.array([[mu]]), np.array([[sigma**2]]), np.array([[1.0]]))
+    # Compute empirical moments of the samples up to order 10
+    empirical_moments = []
+    for i in range(1, 11):
+        empirical_moments.append(np.mean(z_samples ** i))
+
+    # Integrate the probability mass of the input gaussian up to zero
+    integration_limit = 0.0
+    prob_mass = 0.5 * (1 + erf((integration_limit - mu) / (sigma * np.sqrt(2))))
+
+    # Perform Moment-matching with a peak
+    num_components = 2
+    mu_res, c_res, w_res = GMN.match_moments_peak(analytic_moments,prob_mass, num_components)
+
+    mu_non, c_non, w_non = GMN.match_moments(analytic_moments, num_components)
+
+    print("Result of GM Moment Matching with Peak")
+    print("Fitted means:", mu_res)
+    print("Fitted covariances:", c_res)
+    print("Fitted weights:", w_res)
+    print("Result of GM Moment Matching without Peak")
+    print("Fitted means:", mu_non)
+    print("Fitted covariances:", c_non)
+    print("Fitted weights:", w_non)
+
+    moments_peak = []
+    for i in range(10):
+        moments_peak.append(GMN.gm_noncentral_moment(i+1, w_res, mu_res, c_res))
+    
+    moments_non_peak = []
+    for i in range(10):
+        moments_non_peak.append(GMN.gm_noncentral_moment(i+1, w_non, mu_non, c_non))
+    
+    # Compute the relative error
+    rel_error_peak = np.round(100 * (moments_peak - analytic_moments) / analytic_moments, 2)
+    rel_error_non_peak = np.round(100 * (moments_non_peak - analytic_moments) / analytic_moments, 2)
+    print()
+    print("******Comparison of analytic vs. GM-fitted moments with Peak******")
+    for i in range(10):
+        print(f"Analytic: {analytic_moments[i]:.4f}, GM with Peak: {moments_peak[i]:.4f}, Rel. Err.: {rel_error_peak[i]:.4f} %")
+    print()
+    print("******Comparison of analytic vs. GM-fitted moments without Peak******")
+    for i in range(10):
+        print(f"Analytic: {analytic_moments[i]:.4f}, GM without Peak: {moments_non_peak[i]:.4f}, Rel. Err.: {rel_error_non_peak[i]:.4f} %")
+
+    #Sample from a GM with the fitted parameters
+    gmm_fit = GaussianMixture(n_components=num_components)
+    gmm_fit.means_ = mu_res.reshape(-1, 1)
+    gmm_fit.covariances_ = c_res.reshape(-1, 1, 1)
+    gmm_fit.weights_ = w_res
+    X_fit = gmm_fit.sample(num_samples)[0]
+
+    #Sample from a GM with the fitted parameters without peak
+    gmm_fit_non = GaussianMixture(n_components=num_components)
+    gmm_fit_non.means_ = mu_non.reshape(-1, 1)
+    gmm_fit_non.covariances_ = c_non.reshape(-1, 1, 1)
+    gmm_fit_non.weights_ = w_non
+    X_fit_non = gmm_fit_non.sample(num_samples)[0]
+
+
+    #Plot the results as histograms
+    plt.figure(figsize=(7, 5))
+    plt.title("Result of Moment matching with Peak")
+    plt.hist(X_fit.flatten(), bins=100, density=True, color='blue', alpha=0.5, label='GM Samples')
+    plt.hist(X_fit_non.flatten(), bins=100, density=True, color='red', alpha=0.5, label='GM Samples without Peak')
+    plt.hist(z_samples.flatten(), bins=100, density=True, color='green', alpha=0.5, label='Leaky ReLU Samples')
+    plt.legend()
+    plt.xlabel("Value")
+    plt.ylabel("Freq")
+    plt.tight_layout()
+    plt.savefig('figures/moment_matching_peak.png', dpi=300)
+
+
+

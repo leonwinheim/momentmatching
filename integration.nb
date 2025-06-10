@@ -10,10 +10,10 @@
 NotebookFileLineBreakTest
 NotebookFileLineBreakTest
 NotebookDataPosition[       154,          7]
-NotebookDataLength[     56446,       1493]
-NotebookOptionsPosition[     52604,       1424]
-NotebookOutlinePosition[     53044,       1441]
-CellTagsIndexPosition[     53001,       1438]
+NotebookDataLength[     62827,       1654]
+NotebookOptionsPosition[     58761,       1581]
+NotebookOutlinePosition[     59195,       1598]
+CellTagsIndexPosition[     59152,       1595]
 WindowFrame->Normal*)
 
 (* Beginning of Notebook Content *)
@@ -1419,11 +1419,168 @@ Erfc[mu[0]/(Sqrt[2]*sigma[0])]*(mu[0]^10 + 45*mu[0]^8*sigma[0]^2 + \
  CellLabel->
   "Out[106]=",ExpressionUUID->"efad39ed-721e-844b-9939-decb5369d867"]
 }, Open  ]]
+}, Open  ]],
+
+Cell[CellGroupData[{
+
+Cell["Try One-step moment computation", "Subtitle",
+ CellChangeTimes->{{3.9578482115064583`*^9, 
+  3.9578482201103783`*^9}},ExpressionUUID->"29bb288d-0093-0441-9576-\
+f84c62611863"],
+
+Cell[BoxData[
+ RowBox[{
+  RowBox[{"(*", 
+   RowBox[{"Clear", " ", "symbols"}], "*)"}], 
+  RowBox[{
+   RowBox[{"ClearAll", "[", "\"\<Global`*\>\"", "]"}], "\n", 
+   "\[IndentingNewLine]", 
+   RowBox[{"(*", 
+    RowBox[{"Moment", " ", "order", " ", "and", " ", "leaky", " ", "slope"}], 
+    "*)"}], "\[IndentingNewLine]", 
+   RowBox[{
+    RowBox[{"n", "=", "2"}], ";"}], " ", 
+   RowBox[{"(*", 
+    RowBox[{"You", " ", "can", " ", "change", " ", "this"}], "*)"}], "\n", 
+   RowBox[{
+    RowBox[{"\[Alpha]", "=", 
+     RowBox[{"Symbol", "[", "\"\<\[Alpha]\>\"", "]"}]}], ";"}], " ", 
+   RowBox[{"(*", 
+    RowBox[{"LeakyReLU", " ", "slope", " ", 
+     RowBox[{"(", "symbolic", ")"}]}], "*)"}], "\n", "\[IndentingNewLine]", 
+   RowBox[{"(*", 
+    RowBox[{"Define", " ", "Gaussian", " ", "PDFs"}], "*)"}], "\[IndentingNewLine]", 
+   RowBox[{
+    RowBox[{"gaussPDF", "[", 
+     RowBox[{"x_", ",", "\[Mu]_", ",", "\[Sigma]_"}], "]"}], ":=", 
+    RowBox[{"PDF", "[", 
+     RowBox[{
+      RowBox[{"NormalDistribution", "[", 
+       RowBox[{"\[Mu]", ",", "\[Sigma]"}], "]"}], ",", "x"}], "]"}]}], "\n", 
+   "\[IndentingNewLine]", 
+   RowBox[{"(*", 
+    RowBox[{"Define", " ", "variables"}], "*)"}], "\[IndentingNewLine]", 
+   RowBox[{
+    RowBox[{"vars", "=", 
+     RowBox[{"{", 
+      RowBox[{"x1", ",", "x2", ",", "x3", ",", "w1", ",", "w2", ",", "w3"}], 
+      "}"}]}], ";"}], "\n", "\[IndentingNewLine]", 
+   RowBox[{"(*", 
+    RowBox[{"Means", " ", "and", " ", "stddevs", " ", "as", " ", "symbolic"}],
+     "*)"}], "\[IndentingNewLine]", 
+   RowBox[{
+    RowBox[{"\[Mu]x1", "=", 
+     RowBox[{"Symbol", "[", "\"\<\[Mu]x1\>\"", "]"}]}], ";", 
+    RowBox[{"\[Sigma]x1", "=", 
+     RowBox[{"Symbol", "[", "\"\<\[Sigma]x1\>\"", "]"}]}], ";"}], "\n", 
+   RowBox[{
+    RowBox[{"\[Mu]x2", "=", 
+     RowBox[{"Symbol", "[", "\"\<\[Mu]x2\>\"", "]"}]}], ";", 
+    RowBox[{"\[Sigma]x2", "=", 
+     RowBox[{"Symbol", "[", "\"\<\[Sigma]x2\>\"", "]"}]}], ";"}], "\n", 
+   RowBox[{
+    RowBox[{"\[Mu]x3", "=", 
+     RowBox[{"Symbol", "[", "\"\<\[Mu]x3\>\"", "]"}]}], ";", 
+    RowBox[{"\[Sigma]x3", "=", 
+     RowBox[{"Symbol", "[", "\"\<\[Sigma]x3\>\"", "]"}]}], ";"}], "\n", 
+   RowBox[{
+    RowBox[{"\[Mu]w1", "=", 
+     RowBox[{"Symbol", "[", "\"\<\[Mu]w1\>\"", "]"}]}], ";", 
+    RowBox[{"\[Sigma]w1", "=", 
+     RowBox[{"Symbol", "[", "\"\<\[Sigma]w1\>\"", "]"}]}], ";"}], "\n", 
+   RowBox[{
+    RowBox[{"\[Mu]w2", "=", 
+     RowBox[{"Symbol", "[", "\"\<\[Mu]w2\>\"", "]"}]}], ";", 
+    RowBox[{"\[Sigma]w2", "=", 
+     RowBox[{"Symbol", "[", "\"\<\[Sigma]w2\>\"", "]"}]}], ";"}], "\n", 
+   RowBox[{
+    RowBox[{"\[Mu]w3", "=", 
+     RowBox[{"Symbol", "[", "\"\<\[Mu]w3\>\"", "]"}]}], ";", 
+    RowBox[{"\[Sigma]w3", "=", 
+     RowBox[{"Symbol", "[", "\"\<\[Sigma]w3\>\"", "]"}]}], ";"}], "\n", 
+   "\[IndentingNewLine]", 
+   RowBox[{"(*", 
+    RowBox[{
+     RowBox[{"Define", " ", "Z"}], "=", 
+     RowBox[{"sum", " ", "of", " ", "products"}]}], "*)"}], "\[IndentingNewLine]", 
+   RowBox[{
+    RowBox[{"z", "=", 
+     RowBox[{
+      RowBox[{"x1", " ", "w1"}], "+", 
+      RowBox[{"x2", " ", "w2"}], "+", 
+      RowBox[{"x3", " ", "w3"}]}]}], ";"}], "\n", "\[IndentingNewLine]", 
+   RowBox[{"(*", 
+    RowBox[{"Define", " ", "LeakyReLU", " ", "piecewise"}], "*)"}], "\[IndentingNewLine]", 
+   RowBox[{
+    RowBox[{"phi", "=", 
+     RowBox[{"Piecewise", "[", 
+      RowBox[{
+       RowBox[{"{", 
+        RowBox[{"{", 
+         RowBox[{
+          RowBox[{"\[Alpha]", " ", "z"}], ",", 
+          RowBox[{"z", "<", "0"}]}], "}"}], "}"}], ",", "z"}], "]"}]}], ";"}],
+    "\n", "\[IndentingNewLine]", 
+   RowBox[{"(*", 
+    RowBox[{"Construct", " ", "integrand"}], "*)"}], "\[IndentingNewLine]", 
+   RowBox[{
+    RowBox[{"pdf", "=", 
+     RowBox[{
+      RowBox[{"gaussPDF", "[", 
+       RowBox[{"x1", ",", "\[Mu]x1", ",", "\[Sigma]x1"}], "]"}], "*", 
+      RowBox[{"gaussPDF", "[", 
+       RowBox[{"x2", ",", "\[Mu]x2", ",", "\[Sigma]x2"}], "]"}], "*", 
+      RowBox[{"gaussPDF", "[", 
+       RowBox[{"x3", ",", "\[Mu]x3", ",", "\[Sigma]x3"}], "]"}], "*", 
+      RowBox[{"gaussPDF", "[", 
+       RowBox[{"w1", ",", "\[Mu]w1", ",", "\[Sigma]w1"}], "]"}], "*", 
+      RowBox[{"gaussPDF", "[", 
+       RowBox[{"w2", ",", "\[Mu]w2", ",", "\[Sigma]w2"}], "]"}], "*", 
+      RowBox[{"gaussPDF", "[", 
+       RowBox[{"w3", ",", "\[Mu]w3", ",", "\[Sigma]w3"}], "]"}]}]}], ";"}], 
+   "\[IndentingNewLine]", "\n", 
+   RowBox[{
+    RowBox[{"integrand", "=", 
+     RowBox[{
+      RowBox[{"(", 
+       RowBox[{"phi", "^", "n"}], ")"}], "*", "pdf"}]}], ";"}], "\n", 
+   "\[IndentingNewLine]", 
+   RowBox[{"(*", 
+    RowBox[{"Symbolic", " ", "6", "D", " ", "integral"}], "*)"}], "\[IndentingNewLine]", 
+   RowBox[{
+    RowBox[{"moment", "=", 
+     RowBox[{"Integrate", "[", 
+      RowBox[{"integrand", ",", 
+       RowBox[{"Sequence", "@@", 
+        RowBox[{"(", 
+         RowBox[{
+          RowBox[{
+           RowBox[{"{", 
+            RowBox[{"#", ",", 
+             RowBox[{"-", "Infinity"}], ",", "Infinity"}], "}"}], "&"}], "/@",
+           "vars"}], ")"}]}], ",", 
+       RowBox[{"Assumptions", "->", 
+        RowBox[{"{", 
+         RowBox[{
+          RowBox[{"\[Sigma]x1", ">", "0"}], ",", 
+          RowBox[{"\[Sigma]x2", ">", "0"}], ",", 
+          RowBox[{"\[Sigma]x3", ">", "0"}], ",", 
+          RowBox[{"\[Sigma]w1", ">", "0"}], ",", 
+          RowBox[{"\[Sigma]w2", ">", "0"}], ",", 
+          RowBox[{"\[Sigma]w3", ">", "0"}], ",", 
+          RowBox[{"Element", "[", 
+           RowBox[{"\[Alpha]", ",", "Reals"}], "]"}]}], "}"}]}]}], "]"}]}], 
+    ";"}], "\[IndentingNewLine]", "\n", "moment"}]}]], "Input",
+ CellChangeTimes->{{3.957848229836073*^9, 3.9578482371273537`*^9}, {
+   3.9578512951045284`*^9, 3.9578513035991592`*^9}, {3.95785134782934*^9, 
+   3.957851349240473*^9}, {3.9578514926845665`*^9, 3.9578516066688786`*^9}, 
+   3.957855304919279*^9, 3.957855383535122*^9},
+ CellLabel->"In[1]:=",ExpressionUUID->"9a262773-71fa-6447-9d75-5ae5d12435a6"]
 }, Open  ]]
 }, Open  ]]
 },
-WindowSize->{1428, 729.75},
-WindowMargins->{{2719.5, Automatic}, {Automatic, 77.25}},
+WindowSize->{1280, 732},
+WindowMargins->{{-5.5, Automatic}, {Automatic, -5.5}},
 Magnification:>0.9 Inherited,
 FrontEndVersion->"14.2 for Microsoft Windows (64-bit) (March 14, 2025)",
 StyleDefinitions->"Default.nb",
@@ -1493,6 +1650,10 @@ Cell[44872, 1225, 546, 9, 28, "Output",ExpressionUUID->"d397021f-6f53-9a49-8d5e-
 Cell[45421, 1236, 5892, 162, 251, "Output",ExpressionUUID->"0b2b9b28-ac9a-5b47-a3e1-0eace1a9f046"],
 Cell[51316, 1400, 1248, 19, 80, "Output",ExpressionUUID->"efad39ed-721e-844b-9939-decb5369d867"]
 }, Open  ]]
+}, Open  ]],
+Cell[CellGroupData[{
+Cell[52613, 1425, 181, 3, 46, "Subtitle",ExpressionUUID->"29bb288d-0093-0441-9576-f84c62611863"],
+Cell[52797, 1430, 5936, 147, 768, "Input",ExpressionUUID->"9a262773-71fa-6447-9d75-5ae5d12435a6"]
 }, Open  ]]
 }, Open  ]]
 }
