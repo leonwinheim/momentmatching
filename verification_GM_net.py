@@ -15,6 +15,9 @@ import seaborn as sns
 import time
 import os
 from scipy.special import erf
+import pickle
+import pandas as pd
+import math
 
 print("Rennt..")
 
@@ -27,8 +30,10 @@ verify_moment_matching = False
 verify_network = False
 verify_moment_spike = False
 verify_gauss_moment = False
-verify_network_peak = True
+verify_network_peak = False
 verify_moment_matching_peak = False
+test_tuples = False
+test_factorial = True
 
 # Control variables
 np.random.seed(4)  # Set seed for reproducibility
@@ -794,5 +799,59 @@ if verify_moment_matching_peak:
     plt.tight_layout()
     plt.savefig('figures/moment_matching_peak.png', dpi=300)
 
+if test_tuples:
+    # Test how fast tuples can be generated for maximum order of moments 5 andf ten
+    n_min = 1
+    n_max = 6
+    m_min = 10
+    m_max = 50
+    m_step = 5
 
+    result = []
+    perform = True
+    plot = True
+    
+    if perform:
+        for i in range(n_min, n_max+1):
+            for j in range(m_min, m_max+1,m_step):
+                print(f"Testing tuples for n={i}, m={j}")
+                start_time = time.time()
+                tuples = np.array(tuple(GMN.generate_k_tuples_fast(i,j)))
+                end_time = time.time()
+                print(f"Generated {len(tuples)} tuples in {end_time - start_time:.4f} seconds")
+                result.append((i, j, len(tuples), end_time - start_time))
+                
+                with open("workbench/tuples.pkl", "wb") as f:
+                    pickle.dump(result, f)
+    if plot:
+        # Load results from previous runs if available
+        if os.path.exists("workbench/tuples.pkl"):
+            with open("workbench/tuples.pkl", "rb") as f:
+                result = pickle.load(f)
+        else:
+            print("No previous results found")
+            exit()
 
+        # Convert result to DataFrame for easier plotting
+        df = pd.DataFrame(result, columns=["n", "m", "num_tuples", "time_sec"])
+
+        plt.figure(figsize=(8, 4))
+        for n in df["n"].unique():
+            subset = df[df["n"] == n]
+            plt.plot(subset["m"], subset["time_sec"], marker="o", label=f"n={n} (moment order)")
+
+        plt.xlabel("m (max components)")
+        plt.ylabel("Time to generate tuples (seconds)")
+        plt.title("Tuple Generation Time vs. Moment Order")
+        plt.legend()
+        plt.grid(True)
+        plt.tight_layout()
+        plt.savefig("figures/tuple_generation_time.png", dpi=300)
+        plt.show()
+        
+
+if test_factorial:
+    start = time.time()
+    res = math.factorial(100)
+    end = time.time()
+    print(f"Factorial of 100: {res}, computed in {end - start:.4f} seconds")

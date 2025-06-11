@@ -9,7 +9,10 @@ from scipy.optimize import least_squares, LinearConstraint, minimize, Bounds
 from math import factorial, comb
 import time
 from sklearn.mixture import GaussianMixture
-import itertools
+from itertools import combinations
+
+tuple_cache = {}
+factorial_cache = {}
 
 # Noncentral moments of a Gaussian, flexible
 def double_factorial(n):
@@ -34,7 +37,7 @@ def gaussian_noncentral_moment(n, mu, c):
         moment += term
     return moment
 
-# Noncentral moments of a Gaussian MIxture for arbitrary many components and order
+# Noncentral moments of a Gaussian Mixture for arbitrary many components and order
 def gm_noncentral_moment(n, w, mu, c):
     """Compute the n-th noncentral moment of a Gaussian Mixture"""
     moment = 0
@@ -56,6 +59,27 @@ def generate_k_tuples(n, m):
             for tail in generate_k_tuples(n - i, m - 1):
                 yield (i,) + tail
 
+def generate_k_tuples_fast(n, k):
+    positions = range(n + k - 1)
+    for dividers in combinations(positions, k - 1):
+        counts = []
+        last = -1
+        for d in dividers:
+            counts.append(d - last - 1)
+            last = d
+        counts.append(n + k - 1 - last - 1)
+        yield tuple(counts)
+
+def get_factorial(n):
+    """Get the factorial of n, caching the result for future use."""
+    if n in factorial_cache:
+        #print(f"Using cached factorial for {n}")
+        return factorial_cache[n]
+    else:
+        result = factorial(n)
+        factorial_cache[n] = result
+        return result
+
 def moments_pre_act_combined_general(z:np.ndarray,w:np.ndarray,order:int=10):
     """ This function computes the first ten moments of the pre activation value for a single neuron with multiple products input and weight.
         The nature of this computation is a multinomial expansion.
@@ -65,6 +89,8 @@ def moments_pre_act_combined_general(z:np.ndarray,w:np.ndarray,order:int=10):
         order is the number of moments to compute (default is 10)
         
         returns an array of the first ten moments of the pre activation value
+
+        Tuples will be cached
     """
 
     number_moments = order    #If we want to change this, we need to add more moments to the functions above
@@ -98,20 +124,62 @@ def moments_pre_act_combined_general(z:np.ndarray,w:np.ndarray,order:int=10):
     # Computation of the first ten moments
     for i in range(1,number_moments+1):
         # Get multinomial tuples for the desired moment and number of neuron inputs
-        tuples = np.array(tuple(generate_k_tuples(i, z.shape[0])))
+        if (i, z.shape[0]) in tuple_cache:
+            #start = time.time()
+            tuples = tuple_cache[(i, z.shape[0])]
+            #end = time.time()
+            #print(f"Using cached tuples for i={i}, m={z.shape[0]} (count={len(tuples)}), took {end-start:.4f} seconds")
+        else:
+            #start = time.time()
+            tuples = np.array(tuple(generate_k_tuples_fast(i, z.shape[0])))
+            tuple_cache[(i, z.shape[0])] = tuples
+            #end = time.time()
+            #print(f"Generated new tuples for i={i}, m={z.shape[0]} (count={len(tuples)}), took {time.time() - start:.4f} seconds")
+        
+        # start = time.time()
+        # summed = 0
+        # # Iterate through the tuples (I turned it into an array, but still refer to it as value tuples)
+        # for t in range(len(tuples)):
+        #     # Compute the multinomial coefficient of the current tuple
+        #     start_2 = time.time()
+        #     multinom_coeff =  get_factorial(i) // np.prod([get_factorial(k) for k in tuples[t,:]])
+        #     end_2 = time.time()
+        #     # Iterate through the tuple for every x_i and w_i in the pre-activation sum
+        #     expectation_product = 1
+        #     for j in range(z.shape[0]):
+        #         k = tuples[t,j]
+        #         # Do the expectation product
+        #         expectation_product *= moments_z[j][k] * moments_w[j][k]
+        #     # Add up all the values for the moments
+        #     result[i-1] += multinom_coeff * expectation_product
+        #     summed += end_2-start_2
+        # end = time.time()
+        # print(f"Computed multinomial coefficients in {end-start:.4f} seconds, took {summed:.4f} seconds for multi themselves")
 
-        # Iterate through the tuples (I turned it into an array, but still refer to it as value tuples)
-        for t in range(len(tuples)):
-            # Compute the multinomial coefficient of the current tuple
-            multinom_coeff =  factorial(i) // np.prod([factorial(k) for k in tuples[t,:]])
-            # Iterate through the tuple for every x_i and w_i in the pre-activation sum
-            expectation_product = 1
-            for j in range(z.shape[0]):
-                k = tuples[t,j]
-                # Do the expectation product
-                expectation_product *= moments_z[j][k] * moments_w[j][k]
-            # Add up all the values for the moments
-            result[i-1] += multinom_coeff * expectation_product
+        #(GPT vecrotized this)
+        # Precompute factorials up to max needed (replace get_factorial calls)
+        max_factorial = max(i, np.max(tuples))
+        facts = np.empty(max_factorial + 1, dtype=object)
+        facts[0] = 1
+        for idx in range(1, max_factorial + 1):
+            facts[idx] = facts[idx - 1] * idx
+
+        # Vectorized multinomial coefficient calculation
+        tuple_factorials = np.take(facts, tuples)          # shape (num_tuples, d)
+        denominator = np.prod(tuple_factorials, axis=1)    # shape (num_tuples,)
+        multinom_coeffs = facts[i] // denominator           # shape (num_tuples,)
+
+        # Vectorized moments product calculation
+        # For each tuple and each position j, select moments_z[j][k] and moments_w[j][k]
+        # This creates two (num_tuples, d) arrays corresponding to moments_z and moments_w values
+        moments_z_vals = np.array([[moments_z[j][k] for j, k in enumerate(row)] for row in tuples])
+        moments_w_vals = np.array([[moments_w[j][k] for j, k in enumerate(row)] for row in tuples])
+
+        expectation_products = np.prod(moments_z_vals * moments_w_vals, axis=1)  # shape (num_tuples,)
+
+        # Combine multinomial coefficients and expectation products
+        result[i-1] += np.sum(multinom_coeffs * expectation_products)
+
     return result
 
 def moments_pre_act_combined_general_peak(z:np.ndarray,w:np.ndarray,dirac:np.ndarray,order:int=10):
@@ -213,7 +281,6 @@ def match_moments(in_mom,components,solver="trust-constr"):
     """Function to perform the moment matching for given Moments and a desired number of components.
         Solver can be either SLSQP or trust-constr.
     """
-    start = time.time()
     #Fallback
     if components == 2:
         return match_moments_2(in_mom, components)
@@ -292,14 +359,12 @@ def match_moments(in_mom,components,solver="trust-constr"):
     c_res = np.array(result.x[components*2:])
 
     assert np.isclose(np.sum(w_res), 1.0, atol=1e-6), f"Weights do not sum to 1.0 (sum={np.sum(w_res)})"
-    end = time.time()
-    print("Time for optimization: {}".format(end-start))
+
     return mu_res, c_res, w_res
 
 def match_moments_2(in_mom, components):
     """Intermediate solution, only for two components"""
     start = time.time()
-    print("Optimize...")
     if components != 2:
         raise ValueError("This function only works for two components")
     
@@ -316,116 +381,6 @@ def match_moments_2(in_mom, components):
     mu_res = [result.x[1], result.x[2]]
     c_res = [result.x[3], result.x[4]]
     end = time.time()
-    print("Time for optimization: {}".format(end-start))
-    return np.array(mu_res), np.array(c_res), np.array(w_res)
-
-def match_moments_special(in_mom,components,solver="trust-constr"):
-    """Function to perform the moment matching for given Moments and a desired number of components.
-        Solver can be either SLSQP or trust-constr.
-        This  fixes some dirac like GM component at 0
-    """
-
-    #Fallback
-    if components == 2:
-        return match_moments_2_special(in_mom, components)
-
-    else:
-        raise ValueError("This function only works for two components yet")
-    # Assemble the parameter vector according to the number of components. Per Component, we have 3 parameters: w, mu, c
-    # The complete parameter vector will look like this: [w0,w1...,wN,mu0,mu1,...,muN,c0,c1,...,cN]
-    params = np.zeros(components*3, dtype=float)
-
-    #Set the initial guess for the weights as equal and summing up to one
-    for i in range(components):
-        params[i] = 1/components
-
-    #Set the initial guess for the means as the input moments
-    params[components] = -1.8    
-    for i in range(components-1):
-        params[components+i+1] = float(1.8*i)    # Rest of the means 
-
-    #Set the initial guess for the variances as the input moments
-    for i in range(components):
-        params[components*2+i] = 0.1    
-
-    # Optimize this with the minimize function to add in the constraint on the sum of the weights
-
-    l_bounds = np.zeros(components*3)                       # Set the bounds for the parameters as 1D array
-    l_bounds[components:components*2] = -np.inf             # Lower bounds for the means
-    l_bounds[components*2:] = 0.0                           # Lower bounds for the variances
-
-    u_bounds = np.full(components*3, np.inf)                # Set the bounds for the parameters as 1D array
-    u_bounds[0:components] = 1.0                            # Upper bounds for the weights
-    # Means and variances already set to np.inf
-    bounds = Bounds(l_bounds, u_bounds)
-
-    if solver == "trust-constr":
-        in_constr = np.zeros((1,components*3))                      #Set a multiplicator for every parameter
-        in_constr[0,0:components] = 1.0                             # Only the weights are subject to the constraint
-        constraint  = LinearConstraint(in_constr, [1.0], [1.0])     # Constraint on the sum of the weights to 1
-
-        # Call optimizer with bounds and constraints
-        start = time.time()	
-        result = minimize(residuals_matching_n, 
-                            params,
-                            args=in_mom,
-                            method='trust-constr',
-                            bounds=bounds,
-                            constraints=[constraint],
-                            #options={'disp': True, 'xtol': 1e-12, 'gtol':1e-12, 'maxiter': 100000}
-                            options={'disp': False, 'xtol': 1e-6, 'gtol': 1e-6, 'maxiter': 1000}
-                            #options={'disp': False}
-                        )
-        end = time.time()
-        #print("Time for optimization: {}".format(end-start))
-    elif solver == "SLSQP":
-        constraint_dict = {'type': 'eq',
-                        'fun': lambda x: np.sum(x[:components]) - 1.0
-                        }
-        # Call optimizer with bounds and constraints
-        result = minimize(residuals_matching_n, 
-                            params,
-                            args=in_mom,
-                            method='SLSQP',
-                            bounds=bounds,
-                            constraints=[constraint_dict],
-                            #options={'disp': True, 'xtol': 1e-12, 'gtol':1e-12, 'maxiter': 100000}
-                            options={'disp': False}
-                        )
-    else:
-        raise ValueError("Solver not supported. Please use either 'SLSQP' or 'trust-constr'")
-    
-    # print("Result of the optimization:")
-    # print(result)
-    # print("Final parameters:")
-    # print(result.x)
-    
-    w_res = np.array(result.x[:components])
-    mu_res = np.array(result.x[components:components*2])
-    c_res = np.array(result.x[components*2:])
-
-    assert np.isclose(np.sum(w_res), 1.0, atol=1e-6), f"Weights do not sum to 1.0 (sum={np.sum(w_res)})"
-
-    return mu_res, c_res, w_res
-
-def match_moments_2_special(in_mom, components):
-    """Intermediate solution, only for two components with fixed Peak at 0"""
-    if components != 2:
-        raise ValueError("This function only works for two components")
-    
-    #params = [0.5,0.0,5.0,1.0,1.0]  # Initial guess for [w0, mu0, mu1, c0, c1]
-    params = [0.5, 1.0, 0.01, 9.1]  # Initial guess for [w0, mu1, c0, c1]
-
-    # Call optimizer with bounds
-    start = time.time()
-    result = least_squares(residuals_matching_2_special, params, args=in_mom, bounds=([0, -np.inf, 0, 0], [1.0, np.inf, np.inf, np.inf]))
-    end = time.time()
-    #print("Time for optimization: {}".format(end-start))
-
-    w_res = [result.x[0], 1 - result.x[0]]
-    mu_res = [0.0, result.x[1]]
-    c_res = [result.x[2], result.x[3]]
-
     return np.array(mu_res), np.array(c_res), np.array(w_res)
 
 def match_moments_peak(in_mom, in_mass, components, solver="trust-constr"):
@@ -585,45 +540,6 @@ def residuals_matching_2(params, *args):
     # This should return an array
     return residuals
 
-def residuals_matching_2_special(params, *args):
-    """
-        Compute the residual value for the optimization process.
-        Returns the array of indivudal residuals for each moment.
-        This is for two component with special treatment regarding fixed peak
-    """
-    # Unpack the arguments [w0, mu1, c0, c1]
-    t = []
-    for temp in args:
-        t.append(temp)
-    t = np.array(t).squeeze()	
-
-    num_moments = len(t)  # Number of moments to match
-    assert num_moments == 10, "This function is only implemented for 10 moments because of the weighting"
-
-    # Infer how many components we have
-    components = int(len(params)/3)
-    # Extract the parameters from the input vector
-    w = np.array([params[0].squeeze(),1-params[0].squeeze()])
-    mu = np.array([0.0, params[1].squeeze()])
-    c = np.array([params[2].squeeze(), params[3].squeeze()])
-
-    # Compute the moments of the Gaussian Mixture
-    gm_moments = np.zeros(num_moments, dtype=float)
-    for i in range(num_moments):
-        gm_moments[i] = gm_noncentral_moment(i+1, w, mu, c)
-
-    #Additional weighting of the residuals
-    t_sub = np.array([10,5,2,1,1,1,1,1,1,1])    #Subjective weighting of the residuals
-    #t_sub = np.array([1,1,1,1,1,1,1,1,1,1])    # Equal weighting of the residuals
-
-    # Compute the weighted residuals
-    residuals = np.zeros(num_moments, dtype=float)
-    for i in range(num_moments):
-        residuals[i] = t_sub[i]*abs(gm_moments[i] - t[i])/t[i]
-
-    # This should return an array
-    return residuals
-
 def residuals_matching_peak(params, *args):
     """
     Compute the residual value for the optimization process.
@@ -726,22 +642,22 @@ class GaussianMixtureNetwork():
         peak: Boolean indicating whether to use a peak in the network, which will add a Dirac component at 0 for every neuron matching.
         """
         # Add values to instance
-        self.layers = layers
+        self.layers = layers                   
         self.activations = activations.copy()
         self.components_pre = components_pre
         self.components_post = components_post
         self.moments_pre = moments_pre
         self.moments_post = moments_post
         self.a_relu = a_relu
-        self.verif_samples = 500000
-        self.verif_samples_em = 100000
+        self.verif_samples = 500000     # Number of samples to use for verificatioon forward poass based on propagated samples
+        self.verif_samples_em = 100000  # Number of samples to use for verificatioon forward poass based on propagated samples for EM based moment matching
         self.peak = peak
 
         # Intialize the weights and biases
         self.init_parameters()      # For Analytic moment matching
         self.init_parameters_em()   # For EM based moment matching
 
-        # Reset actiuvation functions
+        # Reset activation functions
         self.set_act_func()
 
         # Print out the network structure
@@ -972,6 +888,8 @@ class GaussianMixtureNetwork():
                 self.activation_functions.append(self.relu)
             elif self.activations[i] == 'linear':
                 self.activation_functions.append(self.linear)
+            elif self.activations[i] == 'sigmoid':
+                self.activation_functions.append(self.sigmoid)
             else:
                 raise ValueError(f"Unsupported activation function: {self.activations[i]} but should be {'relu'}")
             
@@ -987,6 +905,12 @@ class GaussianMixtureNetwork():
         if return_name:
             return "linear"
         return x
+
+    def sigmoid(self, x, return_name=False):
+        """Sigmoid activation function"""
+        if return_name:
+            return "sigmoid"
+        return 1 / (1 + np.exp(-x))
 
     def print_network(self):
         """
