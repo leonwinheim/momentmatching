@@ -27,13 +27,13 @@ os.environ["LOKY_MAX_CPU_COUNT"] = "10"
 verify_pre_act = False
 verify_post_act = False
 verify_moment_matching = False
-verify_network = False
+verify_network = True
 verify_moment_spike = False
 verify_gauss_moment = False
 verify_network_peak = False
 verify_moment_matching_peak = False
 test_tuples = False
-test_factorial = True
+test_factorial = False
 
 # Control variables
 np.random.seed(4)  # Set seed for reproducibility
@@ -90,7 +90,7 @@ if verify_pre_act:
         w[i,:] = np.array([np.random.rand(),1.0])
 
     # Draw samples from input and weights
-    num_samples = 500000
+    num_samples = 1000000
     w_samples = np.zeros((num_samples,num_input))
     for i in range(num_input):
         w_samples[:,i] = np.random.normal(w[i,0],w[i,1],num_samples)
@@ -265,11 +265,11 @@ if verify_network:
     act_func = ['relu','relu','linear']
     gm_comp_pre = 2
     gm_comp_post = 2
-    moments_pre = 10
-    moments_post = 10
+    moments_pre = 5
+    moments_post = 5
 
     print("Initializing model...")
-    model = GMN.GaussianMixtureNetwork(layers,act_func,gm_comp_pre,gm_comp_post,moments_pre,moments_post,0.05)
+    model = GMN.GaussianMixtureNetwork(layers,act_func,gm_comp_pre,gm_comp_post,moments_pre,moments_post,0.00)
     print("Initialized model.")
     model.print_network()
     print()
@@ -278,6 +278,7 @@ if verify_network:
 
     #Call comparison function
     model.compare_sample_moments_forward(x)
+    #model.compare_sample_moments_forward_special(x)
 
     #******Visualization******
     num_samples = 10000
@@ -849,7 +850,6 @@ if test_tuples:
         plt.savefig("figures/tuple_generation_time.png", dpi=300)
         plt.show()
         
-
 if test_factorial:
     start = time.time()
     res = math.factorial(100)
