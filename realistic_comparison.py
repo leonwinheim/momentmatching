@@ -28,7 +28,8 @@ print("Model initialized.")
 
 x = np.array([[2.0]])   # Example input value
 
-model.compare_sample_moments_forward_special(x) #Perform all forward passes so the moments are stored, KBNN has to be done seperately
+#model.compare_sample_moments_forward_special(x) #Perform all forward passes so the moments are stored, KBNN has to be done seperately
+model.forward_combined(x)
 
 #******Evaluate the moments*****
 # Output

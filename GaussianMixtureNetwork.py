@@ -1271,3 +1271,169 @@ class GaussianMixtureNetwork():
 
         ######
         return self.post_activation_samples[-1]
+    
+    def forward_combined(self,x):
+        """
+        Forward pass through the network
+        Side by side version of different methods
+        x: Input data, deterministic
+        """
+        #******Control******
+        self.compute_moments = True
+        self.compute_samples = True
+
+        #******Preparation******
+        if self.compute_samples:
+            self.sample_weights()
+
+        #******Handle and asseret input******
+        # Handle scalar input in case it is given as a float or int
+        if isinstance(x,float) or isinstance(x,int):    
+            x = np.array([[x]])
+
+        assert len(x) == self.layers[0], f"Input data must have {self.layers[0]} features, but got {len(x)}"
+
+        ########
+        # Loop over the layers
+        ########
+        for l in range(len(self.layers)-1):
+            #******Moment-Based Handling******
+            if self.compute_moments:
+                # Handle the bias Augmentation and structuring
+                if l == 0:
+                    # First Layer is determinstic Special Case
+                    x_moments = np.concatenate((x, np.ones((1, x.shape[1]))), axis=0)
+                    z_complete = np.stack((x_moments, np.zeros((x_moments.shape[0], x_moments.shape[1])), np.ones((x_moments.shape[0], x_moments.shape[1]))), axis=1) # Emulate a GM behsavior with mean=det, var=0 and weight=1
+                    print("Output GM for the first layer")
+                    print(z_complete)
+
+                else:
+                    # Attention: The bias is represented as a 1-component GM. The other entries have probably more
+                    z_complete = np.stack((self.means_gm_post[l-1][:, :], self.variances_gm_post[l-1][:, :], self.weights_gm_post[l-1][:, :]),axis=1)
+                    z_complete = np.concatenate((z_complete, np.zeros((1, 3, self.components_post))), axis=0)
+                    z_complete[-1, 0, 0] = 1 # Bias as fictive GM component with mean 1
+                    z_complete[-1, 1, 0] = 0 # and variance 0
+                    z_complete[-1, 2, 0] = 1 # and weight 1
+                    
+                    print(f"Output GM for the {l}. layer")
+                    print(z_complete)
+
+            #******Sample-Based Handling******
+            if self.compute_samples:
+                # Handle the bias Augmentation and structuring
+                if l == 0:
+                    # First Layer is determinstic Special Case
+                    x_samples = np.concatenate((x, np.ones((1, 1))), axis=0)
+                    # Blow up x to be a batch of (verif_samples, layers[0]+1)
+                    x_batch = np.tile(x_samples.squeeze(), (self.verif_samples, 1))
+                    samples_before = x_batch
+                else:
+                    # Otherwise, this are the post activation samples from the layer before
+                    samples_before = self.post_activation_samples[l-1]
+
+            ########
+            # Lop over the neurons in the layer
+            ########
+            for i in range(self.layers[l+1]):
+                print(f"Layer {l}, Neuron {i} of {self.layers[l+1]}")
+                # ******Moment-Based Pre-Activation Handling******
+                if self.compute_moments:
+                    # PRE ACTIVATION
+                    # Assemble the weight array for the current neuron (Mean and Variance)
+                    w_array = np.stack((self.weight_means[l][:,i], self.weight_variances[l][:,i]), axis=1)
+                    # Compute Pre-Activation moments
+                    print("Compute Pre-Activation Moments...")
+                    moments_pre = moments_pre_act_combined_general(z_complete,w_array,order=self.moments_pre)
+                    print("Done.")
+                    self.pre_activation_moments_analytic[l][i,:] = moments_pre
+                    # Match the Pre-Activation Moments to a GM
+                    means, variances, weights = match_moments(moments_pre, components = self.components_pre)
+                    self.means_gm_pre[l][i,:] = means
+                    self.variances_gm_pre[l][i,:] = variances
+                    self.weights_gm_pre[l][i,:] = weights
+                    # Compute the fitted moments from the GM (as a backup)
+                    for tt in range(self.moments_pre):
+                        self.pre_activation_moments_fitted[l][i,tt] = gm_noncentral_moment(tt+1, weights, means, variances)
+                    
+                    # POST ACTIVATION
+                    if self.activations[l] == 'relu':
+                        # Compute moments of the post activation
+                        moments_post =  moments_post_act(self.a_relu, self.means_gm_pre[l][i,:], self.variances_gm_pre[l][i,:], self.weights_gm_pre[l][i,:],order=self.moments_post)
+                        self.post_activation_moments_analytic[l][i,:] = moments_post
+
+                        # Matching with Peak of absorbed mass
+                        if self.peak:                        
+                            # If we set peak, we need to match the moments with a Dirac component at 0
+                            absorbed_mass = self.compute_absorbed_mass(self.weights_gm_pre[l][i,:], self.means_gm_pre[l][i,:], self.variances_gm_pre[l][i,:])
+                            means, variances, weights = match_moments_peak(moments_post, absorbed_mass, components = self.components_post)
+                            self.means_gm_post[l][i,:] = means
+                            self.variances_gm_post[l][i,:] = variances
+                            self.weights_gm_post[l][i,:] = weights
+                            self.dirac_weight_post[l][i] = absorbed_mass  # Set the Dirac weight to the absorbed mass      
+                        
+                            # Compute the fitted moments from the GM (as a backup)
+                            for tt in range(self.moments_post):
+                                self.post_activation_moments_fitted[l][i,tt] = gm_noncentral_moment(tt+1, weights, means, variances)
+                        
+                        # Conventional matching, no peak
+                        else:                        
+                            # Match the GM parameters to the moments
+                            means, variances, weights = match_moments(moments_post, components = self.components_post)
+                            self.means_gm_post[l][i,:] = means
+                            self.variances_gm_post[l][i,:] = variances
+                            self.weights_gm_post[l][i,:] = weights
+
+                            # Compute the fitted moments from the GM (as a backup)
+                            for tt in range(self.moments_post):
+                                self.post_activation_moments_fitted[l][i,tt] = gm_noncentral_moment(tt+1, weights, means, variances)
+                        
+
+                    elif self.activations[l] == 'linear':
+                        # Just take the pre moments as the transformation is linear with slope 1
+                        moments_post = moments_pre
+                        self.post_activation_moments_analytic[l][i,:] = moments_post   
+
+                        # Match the GM parameters to the moments
+                        means, variances, weights = match_moments(moments_post, components = self.components_post)
+                        self.means_gm_post[l][i,:] = means
+                        self.variances_gm_post[l][i,:] = variances
+                        self.weights_gm_post[l][i,:] = weights
+
+                        # Compute the fitted moments from the GM (as a backup)
+                        for tt in range(self.moments_post):
+                            self.post_activation_moments_fitted[l][i,tt] = gm_noncentral_moment(tt+1, weights, means, variances)
+
+                    else:
+                        raise ValueError(f"Unsupported activation function: {self.activations[l]} but should be {'relu'} or {'linear'}")
+
+                # ******Sample-Based Pre-Activation Handling******
+                if self.compute_samples:
+                    # Compute Pre-Activation Samples
+                    self.pre_activation_samples[l][:,i]  = np.sum(samples_before * self.weight_samples[l][:, :, i], axis=1)
+                    
+                    # Compute the empirical moments of the sample set
+                    moments = np.zeros(self.moments_pre)
+                    for order in range(1, self.moments_pre+1):
+                        moments[order-1] = np.mean(self.pre_activation_samples[l][:,i]**order)
+                    
+                    self.pre_activation_moments_samples[l][i, :] = moments
+
+                    # Compute Post Activation Samples
+                    self.post_activation_samples[l][:, i]= self.activation_functions[l](self.pre_activation_samples[l][:,i])
+
+                    # Compute the empirical moments of the sample set
+                    moments = np.zeros(self.moments_post)
+                    for order in range(1, self.moments_post+1):
+                        moments[order-1] = np.mean(self.post_activation_samples[l][:, i]**order)
+
+                    self.post_activation_moments_samples[l][i, :] = moments
+
+                #******Compare Moments******
+                if self.compute_moments and self.compute_samples:
+                    # Compare the moments of the sample-based and moment-based approach
+                    rel_pre = np.round(100 * (self.pre_activation_moments_analytic[l][i, :] - self.pre_activation_moments_samples[l][i, :]) / (self.pre_activation_moments_samples[l][i, :] + 1e-12), 2)
+                    rel_post = np.round(100 * (self.post_activation_moments_analytic[l][i, :] - self.post_activation_moments_samples[l][i, :]) / (self.post_activation_moments_samples[l][i, :] + 1e-12), 2)
+
+                    print(f"  Pre-Activation Relative Error: {rel_pre}")
+                    print(f"  Post-Activation Relative Error: {rel_post}")
+        return None
