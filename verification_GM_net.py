@@ -24,10 +24,10 @@ print("Rennt..")
 os.environ["LOKY_MAX_CPU_COUNT"] = "10"
 
 # Flags to chose what to do
-verify_pre_act = False
+verify_pre_act = True
 verify_post_act = False
 verify_moment_matching = False
-verify_network = True
+verify_network = False
 verify_moment_spike = False
 verify_gauss_moment = False
 verify_network_peak = False
@@ -117,7 +117,7 @@ if verify_pre_act:
     # Define True GM input parameters
     x_gm_input = np.zeros((num_input,3,2))     #Input
     for i in range(num_input):
-        x_gm_input[i,:,:] = np.array([[np.random.rand(),np.random.rand()],[1.0,1.5],[0.3,0.7]])
+        x_gm_input[i,:,:] = np.array([[1.0,20.0],[3.0,5.5],[0.2,0.8]])
 
     # Sample from multiple GMs
     x_gm_samples = np.zeros((num_samples,num_input))
