@@ -223,10 +223,12 @@ def moments_post_act(a:float,mu:np.ndarray,c:np.ndarray,w:np.ndarray,order:int=1
 
         returns the first ten moments of the post activation distribution
     """
-    assert np.max(c) >= 0.01, "Variance must be big enough"
 
     num_moments = order
     assert len(mu) == len(c) == len(w), "mu, c, and w must have the same length"
+    # if c <0.001:
+    #     print("Variance is too small, setting to 0.001 to avoid numerical issues")
+    #     c = np.maximum(c, 0.001)
     sigma = np.sqrt(c)
 
     # Initialize result vector 
@@ -234,6 +236,9 @@ def moments_post_act(a:float,mu:np.ndarray,c:np.ndarray,w:np.ndarray,order:int=1
 
     # Iterate over components of the GM
     for i in range(len(mu)):
+        if mu[i]**2/(2*sigma[i]**2)>700:
+            print(f"Very narrow component, willoverflow and moments are therefor set to zero. It is: {mu[i]} with sigma {sigma[i]} and weight {w[i]}")
+            continue  # Skip this component if it will overflow, which will cause the additional moments to be zero
         result[0] += (((1 + erf(mu[i]/(np.sqrt(2)*sigma[i])))*mu[i])/2 +(a*erfc(mu[i]/(np.sqrt(2)*sigma[i]))*mu[i])/2 + sigma[i]/(np.exp(mu[i]**2/(2*sigma[i]**2))*np.sqrt(2*np.pi)) - (a*sigma[i])/(np.exp(mu[i]**2/(2*sigma[i]**2))*np.sqrt(2*np.pi)))*w[i]
         result[1] += ((mu[i]*sigma[i])/(np.exp(mu[i]**2/(2*sigma[i]**2))*np.sqrt(2*np.pi)) -(a**2*mu[i]*sigma[i])/(np.exp(mu[i]**2/(2*sigma[i]**2))*np.sqrt(2*np.pi)) + ((1 + erf(mu[i]/(np.sqrt(2)*sigma[i])))*(mu[i]**2 + sigma[i]**2))/2 + (a**2*erfc(mu[i]/(np.sqrt(2)*sigma[i]))*(mu[i]**2 + sigma[i]**2))/2)*w[i]
         result[2] += ((sigma[i]*(mu[i]**2 + 2*sigma[i]**2))/(np.exp(mu[i]**2/(2*sigma[i]**2))*np.sqrt(2*np.pi)) - (a**3*sigma[i]*(mu[i]**2 + 2*sigma[i]**2))/(np.exp(mu[i]**2/(2*sigma[i]**2))*np.sqrt(2*np.pi)) + ((1 + erf(mu[i]/(np.sqrt(2)*sigma[i])))*mu[i]*(mu[i]**2 + 3*sigma[i]**2))/2 + (a**3*erfc(mu[i]/(np.sqrt(2)*sigma[i]))*mu[i]*(mu[i]**2 + 3*sigma[i]**2))/2)*w[i]
@@ -244,8 +249,12 @@ def moments_post_act(a:float,mu:np.ndarray,c:np.ndarray,w:np.ndarray,order:int=1
         result[7] += ((mu[i] * sigma[i] * (mu[i]**6 + 27 * mu[i]**4 * sigma[i]**2 + 185 * mu[i]**2 * sigma[i]**4 + 279 * sigma[i]**6)) /(np.exp(mu[i]**2 / (2 * sigma[i]**2)) * np.sqrt(2 * np.pi))- (a**8 * mu[i] * sigma[i] * (mu[i]**6 + 27 * mu[i]**4 * sigma[i]**2 + 185 * mu[i]**2 * sigma[i]**4 + 279 * sigma[i]**6)) /(np.exp(mu[i]**2 / (2 * sigma[i]**2)) * np.sqrt(2 * np.pi))+ ((1 + erf(mu[i] / (np.sqrt(2) * sigma[i]))) * (mu[i]**8 + 28 * mu[i]**6 * sigma[i]**2 + 210 * mu[i]**4 * sigma[i]**4 + 420 * mu[i]**2 * sigma[i]**6 + 105 * sigma[i]**8)) / 2+ (a**8 * erfc(mu[i] / (np.sqrt(2) * sigma[i])) * (mu[i]**8 + 28 * mu[i]**6 * sigma[i]**2 + 210 * mu[i]**4 * sigma[i]**4 + 420 * mu[i]**2 * sigma[i]**6 + 105 * sigma[i]**8)) / 2) * w[i]
         result[8] += ((sigma[i]*(mu[i]**8 + 35*mu[i]**6*sigma[i]**2 + 345*mu[i]**4*sigma[i]**4 + 975*mu[i]**2*sigma[i]**6 + 384*sigma[i]**8))/(np.exp(mu[i]**2/(2*sigma[i]**2))*np.sqrt(2*np.pi))- (a**9*sigma[i]*(mu[i]**8 + 35*mu[i]**6*sigma[i]**2 + 345*mu[i]**4*sigma[i]**4 + 975*mu[i]**2*sigma[i]**6 + 384*sigma[i]**8))/(np.exp(mu[i]**2/(2*sigma[i]**2))*np.sqrt(2*np.pi))+ ((1 + erf(mu[i]/(np.sqrt(2)*sigma[i])))*mu[i]*(mu[i]**8 + 36*mu[i]**6*sigma[i]**2 + 378*mu[i]**4*sigma[i]**4 + 1260*mu[i]**2*sigma[i]**6 + 945*sigma[i]**8))/2+ (a**9*erfc(mu[i]/(np.sqrt(2)*sigma[i]))*mu[i]*(mu[i]**8 + 36*mu[i]**6*sigma[i]**2 + 378*mu[i]**4*sigma[i]**4 + 1260*mu[i]**2*sigma[i]**6 + 945*sigma[i]**8))/2) * w[i]
         result[9] += w[i] * ((mu[i] * sigma[i] * (mu[i]**8 + 44 * mu[i]**6 * sigma[i]**2 + 588 * mu[i]**4 * sigma[i]**4 + 2640 * mu[i]**2 * sigma[i]**6 + 2895 * sigma[i]**8)) / (np.exp(mu[i]**2 / (2 * sigma[i]**2)) * np.sqrt(2 * np.pi))+ ((1 + erf(mu[i] / (np.sqrt(2) * sigma[i]))) * (mu[i]**10 + 45 * mu[i]**8 * sigma[i]**2 + 630 * mu[i]**6 * sigma[i]**4 + 3150 * mu[i]**4 * sigma[i]**6 + 4725 * mu[i]**2 * sigma[i]**8 + 945 * sigma[i]**10)) / 2+ (a**10 * (-np.sqrt(2 / np.pi) * mu[i] * sigma[i] * (mu[i]**8 + 44 * mu[i]**6 * sigma[i]**2 + 588 * mu[i]**4 * sigma[i]**4 + 2640 * mu[i]**2 * sigma[i]**6 + 2895 * sigma[i]**8) / np.exp(mu[i]**2 / (2 * sigma[i]**2)) + erfc(mu[i] / (np.sqrt(2) * sigma[i])) * (mu[i]**10 + 45 * mu[i]**8 * sigma[i]**2 + 630 * mu[i]**6 * sigma[i]**4 + 3150 * mu[i]**4 * sigma[i]**6 + 4725 * mu[i]**2 * sigma[i]**8 + 945 * sigma[i]**10)) / 2))
-        
-    return result[:num_moments]  # Return only the first 8 moments, as the last two are not needed for the network
+    if result[0] <1e-6:
+        print("First moment is 0!")
+        print("Post-activation GM parameters:")
+        for idx in range(len(mu)):
+            print(f"  Component {idx}: mean={mu[idx]:.4f}, var={c[idx]:.4f}, weight={w[idx]:.4f}")
+    return result[:num_moments]  
 
 def match_moments(in_mom,components,solver="trust-constr"):
     """Function to perform the moment matching for given Moments and a desired number of components.
@@ -282,42 +291,58 @@ def match_moments(in_mom,components,solver="trust-constr"):
     u_bounds[0:components] = 1.0                            # Upper bounds for the weights
     # Means and variances already set to np.inf
     bounds = Bounds(l_bounds, u_bounds)
+    
+    tries = 10
 
-    if solver == "trust-constr":
-        in_constr = np.zeros((1,components*3))                      #Set a multiplicator for every parameter
-        in_constr[0,0:components] = 1.0                             # Only the weights are subject to the constraint
-        constraint  = LinearConstraint(in_constr, [1.0], [1.0])     # Constraint on the sum of the weights to 1
+    for j in range(tries):
+        if solver == "trust-constr":
+            in_constr = np.zeros((1,components*3))                      #Set a multiplicator for every parameter
+            in_constr[0,0:components] = 1.0                             # Only the weights are subject to the constraint
+            constraint  = LinearConstraint(in_constr, [1.0], [1.0])     # Constraint on the sum of the weights to 1
 
-        # Call optimizer with bounds and constraints
-        start = time.time()	
-        result = minimize(residuals_matching_n, 
-                            params,
-                            args=in_mom,
-                            method='trust-constr',
-                            bounds=bounds,
-                            constraints=[constraint],
-                            #options={'disp': True, 'xtol': 1e-12, 'gtol':1e-12, 'maxiter': 100000}
-                            #options={'disp': False, 'xtol': 1e-6, 'gtol': 1e-6, 'maxiter': 1000}
-                            #options={'disp': False}
-                        )
-        end = time.time()
-        #print("Time for optimization: {}".format(end-start))
-    elif solver == "SLSQP":
-        constraint_dict = {'type': 'eq',
-                        'fun': lambda x: np.sum(x[:components]) - 1.0
-                        }
-        # Call optimizer with bounds and constraints
-        result = minimize(residuals_matching_n, 
-                            params,
-                            args=in_mom,
-                            method='SLSQP',
-                            bounds=bounds,
-                            constraints=[constraint_dict],
-                            #options={'disp': True, 'xtol': 1e-12, 'gtol':1e-12, 'maxiter': 100000}
-                            options={'disp': False}
-                        )
-    else:
-        raise ValueError("Solver not supported. Please use either 'SLSQP' or 'trust-constr'")
+            # Call optimizer with bounds and constraints
+            start = time.time()	
+            result = minimize(residuals_matching_n, 
+                                params,
+                                args=in_mom,
+                                method='trust-constr',
+                                bounds=bounds,
+                                constraints=[constraint],
+                                #options={'disp': True, 'xtol': 1e-12, 'gtol':1e-12, 'maxiter': 100000}
+                                #options={'disp': False, 'xtol': 1e-6, 'gtol': 1e-6, 'maxiter': 1000}
+                                #options={'disp': False}
+                            )
+            end = time.time()
+            #print("Time for optimization: {}".format(end-start))
+        elif solver == "SLSQP":
+            constraint_dict = {'type': 'eq',
+                            'fun': lambda x: np.sum(x[:components]) - 1.0
+                            }
+            # Call optimizer with bounds and constraints
+            result = minimize(residuals_matching_n, 
+                                params,
+                                args=in_mom,
+                                method='SLSQP',
+                                bounds=bounds,
+                                constraints=[constraint_dict],
+                                #options={'disp': True, 'xtol': 1e-12, 'gtol':1e-12, 'maxiter': 100000}
+                                options={'disp': False}
+                            )
+        else:
+            raise ValueError("Solver not supported. Please use either 'SLSQP' or 'trust-constr'")
+        
+        if result.fun > 1e-2:
+            print("Optimization did not converge to a good solution, consider adjusting the initial guess or the bounds.")
+            print(f"Residuals: {result.fun}")
+            if j == tries - 1:
+                raise ValueError("Failed to find a solution after multiple attempts. Consider adjusting the initial guess or the bounds.")
+            for i in range(components):
+                params[components*2+i] = 1.0* np.random.uniform(0.5, 5)  # Randomly adjust the variances
+            print("New Initial Guess:", params)
+            continue
+        else:
+            break
+
     
     # print("Result of the optimization:")
     # print(result)
@@ -337,15 +362,30 @@ def match_moments_2(in_mom, components):
     start = time.time()
     if components != 2:
         raise ValueError("This function only works for two components")
-    
-    #params = [0.5,0.0,5.0,1.0,1.0]  # Initial guess for [w0, mu0, mu1, c0, c1]
-    params = [0.5,0.0,1.0,0.1,0.1]  # Initial guess for [w0, mu0, mu1, c0, c1]
+    tries = 10
 
-    # Call optimizer with bounds
-    start = time.time()
-    result = least_squares(residuals_matching_2, params, args=in_mom, bounds=([0, -np.inf, -np.inf, 0, 0], [1.0, np.inf, np.inf, np.inf, np.inf]))
-    end = time.time()
-    #print("Residuals:", result.fun)
+    #params = [0.5,0.0,5.0,1.0,1.0]  # Initial guess for [w0, mu0, mu1, c0, c1]
+    params = [0.5,0.0,1.0,1.0,1.0]  # Initial guess for [w0, mu0, mu1, c0, c1]
+
+    for i in range(tries):
+
+        # Call optimizer with bounds
+        start = time.time()
+        result = least_squares(residuals_matching_2, params, args=in_mom, bounds=([0, -np.inf, -np.inf, 0.01, 0.01], [1.0, np.inf, np.inf, np.inf, np.inf]))
+        end = time.time()
+        # print("Residuals:", result.fun)
+        if min(result.fun) > 1e-2 :
+            print(f"Iteration {i+1}/{tries} failed, trying again with different initial guess")
+            print(f"Residuals: {result.fun}")
+            params = [0.5,-1.2,1.4,1.0,1.0]  # Initial guess for [w0, mu0, mu1, c0, c1]
+            params[-2] = params[-2] *np.random.uniform(0.5, 5)  # Randomly adjust the second mean
+            params[-1] = params[-1] *np.random.uniform(0.5, 5)  # Randomly adjust the second mean
+            print("New Initial Guess:", params)
+            if i == tries - 1:
+                raise ValueError("Failed to find a solution after multiple attempts. Consider adjusting the initial guess or the bounds.")
+            continue  # If the residuals are too high, try again with a different initial guess:
+        else:
+            break
 
     w_res = [result.x[0], 1 - result.x[0]]
     mu_res = [result.x[1], result.x[2]]
@@ -574,7 +614,7 @@ def match_samples_em(in_samples, components):
 
 def sample_gm(mu, c, w, num_samples=1000):
     """
-    Sample from a Gaussian Mixture model with given means, variances, and weights.
+    Sample from a Gaussian Mixture model using scikit-learn's GaussianMixture.
     
     mu: Means of the Gaussian components.
     c: Variances of the Gaussian components.
@@ -584,17 +624,22 @@ def sample_gm(mu, c, w, num_samples=1000):
     Returns:
         samples: Array of sampled values from the Gaussian Mixture model.
     """
-    # Check if the input arrays are valid
-    if len(mu) != len(c) or len(mu) != len(w):
-        raise ValueError("Means, variances, and weights must have the same length.")
 
-    # Sample from the Gaussian Mixture model
-    samples = np.zeros(num_samples)
-    for i in range(num_samples):
-        component = np.random.choice(len(mu), p=w)
-        samples[i] = np.random.normal(mu[component], np.sqrt(c[component]))
+    mu = np.asarray(mu)
+    c = np.asarray(c)
+    w = np.asarray(w)
 
-    return samples
+    # Prepare parameters for GaussianMixture
+    n_components = len(mu)
+    gmm = GaussianMixture(n_components=n_components, covariance_type='full')
+    gmm.weights_ = w / np.sum(w)
+    gmm.means_ = mu.reshape(-1, 1)
+    gmm.covariances_ = c.reshape(-1, 1, 1)
+    # scikit-learn expects precisions_cholesky_
+    #gmm.precisions_cholesky_ = 1.0 / np.sqrt(gmm.covariances_)
+
+    samples, _ = gmm.sample(num_samples)
+    return samples.flatten()
 #########################################################################################   
 # Define the network class to build actual architecture
 
@@ -645,9 +690,10 @@ class GaussianMixtureNetwork():
         # Iterate over the layers
         for i in range(len(self.layers)-1):
             # Initialize the weights for each layer. Add 1 for the bias
-            weight_mean = np.random.rand(self.layers[i]+1, self.layers[i+1])
+            weight_mean = (np.random.rand(self.layers[i]+1, self.layers[i+1]) - 0.5)*1
+            #weight_mean = np.ones((self.layers[i]+1, self.layers[i+1])) * 10  # Initialize with small values
             self.weight_means.append(weight_mean)
-            weight_variance = np.ones((self.layers[i]+1, self.layers[i+1]))
+            weight_variance = np.ones((self.layers[i]+1, self.layers[i+1])) * 1
             self.weight_variances.append(weight_variance)
 
         # Initialize the containers for the GM parameters in pre-activation (and potentially Dirac Weight)
@@ -763,6 +809,7 @@ class GaussianMixtureNetwork():
 
     def sample_weights(self):
         """Generate samples of every weight and bias in the network, mainly needed for verification"""
+        print("Sampling weights for verification...")
         # Generate weight samples
         self.weight_samples = []
         # Iterate through layers
@@ -771,11 +818,20 @@ class GaussianMixtureNetwork():
             samples = np.zeros((self.verif_samples, self.layers[i]+1, self.layers[i+1]))
             for row in range(self.layers[i]+1):
                 for col in range(self.layers[i+1]):
-                    samples[:, row, col] = np.random.normal(
-                    self.weight_means[i][row, col],
-                    self.weight_variances[i][row, col],
-                    self.verif_samples
-                    )
+                    sample_check=True
+                    while sample_check:
+                        samples[:, row, col] = np.random.normal(
+                        self.weight_means[i][row, col],
+                        np.sqrt(self.weight_variances[i][row, col]),
+                        self.verif_samples
+                        )
+                        if abs(np.mean(samples[:, row, col])- self.weight_means[i][row, col]) < 0.01*np.abs(self.weight_means[i][row, col]) and abs(np.std(samples[:, row, col]) - np.sqrt(self.weight_variances[i][row, col])) < 0.01*np.abs(np.sqrt(self.weight_variances[i][row, col])):
+                            sample_check = False
+                            #print(f"Accepted with mean {np.mean(samples[:, row, col])} and std {np.std(samples[:, row, col])} at layer {i}, row {row}, col {col}.")
+                            break
+                        else:
+                            pass
+                            #print(f"Better samples neede at layer {i}, row {row}, col {col}.")
             self.weight_samples.append(samples)
         
         # Generate post-activation sample container
@@ -814,6 +870,7 @@ class GaussianMixtureNetwork():
             samples = np.zeros((self.layers[i+1],self.moments_post))
 
             self.post_activation_moments_samples.append(samples)
+        print("Sampling weights for verification done.")
 
     def sample_weights_em(self):
         """Generate samples of every weight and bias in the network, mainly needed for verification"""
@@ -827,7 +884,7 @@ class GaussianMixtureNetwork():
                 for col in range(self.layers[i+1]):
                     samples[:, row, col] = np.random.normal(
                     self.weight_means_em[i][row, col],
-                    self.weight_variances_em[i][row, col],
+                    np.sqrt(self.weight_variances_em[i][row, col]),
                     self.verif_samples_em
                     )
             self.weight_samples_em.append(samples)
@@ -1304,9 +1361,13 @@ class GaussianMixtureNetwork():
                     # First Layer is determinstic Special Case
                     x_moments = np.concatenate((x, np.ones((1, x.shape[1]))), axis=0)
                     z_complete = np.stack((x_moments, np.zeros((x_moments.shape[0], x_moments.shape[1])), np.ones((x_moments.shape[0], x_moments.shape[1]))), axis=1) # Emulate a GM behsavior with mean=det, var=0 and weight=1
-                    print("Output GM for the first layer")
-                    print(z_complete)
+                    #print("Output GM for the first layer")
+                    #print(z_complete)
 
+                elif l == 2 and False:
+                    z_complete = z_complete
+                    self.weight_means[l] = self.weight_means[l-1]
+                    self.weight_variances[l] = self.weight_variances[l-1]
                 else:
                     # Attention: The bias is represented as a 1-component GM. The other entries have probably more
                     z_complete = np.stack((self.means_gm_post[l-1][:, :], self.variances_gm_post[l-1][:, :], self.weights_gm_post[l-1][:, :]),axis=1)
@@ -1315,8 +1376,8 @@ class GaussianMixtureNetwork():
                     z_complete[-1, 1, 0] = 0 # and variance 0
                     z_complete[-1, 2, 0] = 1 # and weight 1
                     
-                    print(f"Output GM for the {l}. layer")
-                    print(z_complete)
+                    #print(f"Output GM for the {l}. layer")
+                    #print(z_complete)
 
             #******Sample-Based Handling******
             if self.compute_samples:
@@ -1327,24 +1388,32 @@ class GaussianMixtureNetwork():
                     # Blow up x to be a batch of (verif_samples, layers[0]+1)
                     x_batch = np.tile(x_samples.squeeze(), (self.verif_samples, 1))
                     samples_before = x_batch
+                elif l == 2 and False:
+                    samples_before = samples_before
+                    self.weight_samples[l] = self.weight_samples[l-1]
+                
                 else:
                     # Otherwise, this are the post activation samples from the layer before
                     samples_before = self.post_activation_samples[l-1]
+
+                    # Alternative: Sample from  the fitted GM, except for bias
+                    #for co in range(self.layers[l]):
+                        #samples_before[:, co] = sample_gm(self.means_gm_post[l-1][co,:], self.variances_gm_post[l-1][co,:], self.weights_gm_post[l-1][co,:], self.verif_samples)
 
             ########
             # Lop over the neurons in the layer
             ########
             for i in range(self.layers[l+1]):
-                print(f"Layer {l}, Neuron {i} of {self.layers[l+1]}")
+                #print(f"Layer {l}, Neuron {i} of {self.layers[l+1]}")
                 # ******Moment-Based Pre-Activation Handling******
                 if self.compute_moments:
                     # PRE ACTIVATION
                     # Assemble the weight array for the current neuron (Mean and Variance)
                     w_array = np.stack((self.weight_means[l][:,i], self.weight_variances[l][:,i]), axis=1)
                     # Compute Pre-Activation moments
-                    print("Compute Pre-Activation Moments...")
+                    #print("Compute Pre-Activation Moments...")
                     moments_pre = moments_pre_act_combined_general(z_complete,w_array,order=self.moments_pre)
-                    print("Done.")
+                    #print("Done.")
                     self.pre_activation_moments_analytic[l][i,:] = moments_pre
                     # Match the Pre-Activation Moments to a GM
                     means, variances, weights = match_moments(moments_pre, components = self.components_pre)
@@ -1428,12 +1497,18 @@ class GaussianMixtureNetwork():
 
                     self.post_activation_moments_samples[l][i, :] = moments
 
-                #******Compare Moments******
-                if self.compute_moments and self.compute_samples:
-                    # Compare the moments of the sample-based and moment-based approach
-                    rel_pre = np.round(100 * (self.pre_activation_moments_analytic[l][i, :] - self.pre_activation_moments_samples[l][i, :]) / (self.pre_activation_moments_samples[l][i, :] + 1e-12), 2)
-                    rel_post = np.round(100 * (self.post_activation_moments_analytic[l][i, :] - self.post_activation_moments_samples[l][i, :]) / (self.post_activation_moments_samples[l][i, :] + 1e-12), 2)
+                # #******Compare Moments******
+                # if self.compute_moments and self.compute_samples:
+                #     # Compare the moments of the sample-based and moment-based approach
+                #     rel_pre = np.round(100 * (self.pre_activation_moments_analytic[l][i, :] - self.pre_activation_moments_samples[l][i, :]) / (self.pre_activation_moments_samples[l][i, :] + 1e-12), 2)
+                #     rel_post = np.round(100 * (self.post_activation_moments_analytic[l][i, :] - self.post_activation_moments_samples[l][i, :]) / (self.post_activation_moments_samples[l][i, :] + 1e-12), 2)
 
-                    print(f"  Pre-Activation Relative Error: {rel_pre}")
-                    print(f"  Post-Activation Relative Error: {rel_post}")
+                #     print(f"  Pre-Activation Relative Error: {rel_pre} %")
+                #     print(f"  Post-Activation Relative Error: {rel_post} %")
+            
+        # print("Output GM ")
+        # if self.compute_moments:
+        #     print(self.means_gm_post[-1])
+        #     print(self.variances_gm_post[-1])
+        #     print(self.weights_gm_post[-1])
         return None

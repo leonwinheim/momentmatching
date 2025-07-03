@@ -8,14 +8,15 @@ import pickle
 os.environ["LOKY_MAX_CPU_COUNT"] = "10"
 
 #******Control variables******
-np.random.seed(5)  # For reproducibility
+#np.random.seed(5)  # For reproducibility
 
 #******Network Architecture******
 # layers = [1,50,1]
 # act_func = ['relu','linear']
-layers = [1,5,5,5,1]
-act_func = ['relu','relu','relu','relu']
-#act_func = ['linear','linear','linear','linear']
+layers = [1,10,10,10,1]
+act_func = ['relu','relu','relu','linear']
+# layers = [1,5,5,1]
+# act_func = ['relu','relu','linear']
 gm_comp_pre = 2
 gm_comp_post =2
 moments_pre = 5
@@ -68,14 +69,14 @@ np.random.seed(41)  # Reset seed for reproducibility
 #******Network Architecture******
 # layers = [1,50,1]
 # act_func = ['relu','linear']
-# layers = [1,5,5,5,1]
-# act_func = ['relu','relu','relu','relu']
-# gm_comp_pre = 1
-# gm_comp_post = 1
-# moments_pre = 2
-# moments_post = 2
+layers = [1,10,10,10,1]
+act_func = ['relu','relu','relu','linear']
+gm_comp_pre = 1
+gm_comp_post = 1
+moments_pre = 2
+moments_post = 2
 moments_eval = 5
-# a_relu = 0.0
+a_relu = 0.0
 
 # print("Initializing second model...")
 # model = GMN.GaussianMixtureNetwork(layers,act_func,gm_comp_pre,gm_comp_post,moments_pre,moments_post,a_relu,peak=False)
